@@ -16,6 +16,8 @@ interface SongDetailProps {
 export default function SongDetail({ song, onBack, onHome }: SongDetailProps) {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [availableHeight, setAvailableHeight] = useState(0);
+  const [preloadedImages, setPreloadedImages] = useState<Set<number>>(new Set());
+  const [loadingProgress, setLoadingProgress] = useState(0);
   
   // Touch/Swipe functionality
   const touchStartX = useRef<number>(0);
@@ -48,6 +50,98 @@ export default function SongDetail({ song, onBack, onHome }: SongDetailProps) {
     
     return () => window.removeEventListener('resize', calculateAvailableHeight);
   }, []);
+
+  // Intelligentes Preloading System für alle Bilder
+  useEffect(() => {
+    if (images.length === 0) return;
+
+    let loadedCount = 0;
+    
+    console.log(`🖼️ Starte intelligentes Preloading von ${images.length} Bildern...`);
+
+    // Prioritätsliste: Aktuelles Bild, dann nächste/vorherige, dann der Rest
+    const getPriorityOrder = () => {
+      const order: number[] = [];
+      const visited = new Set<number>();
+      
+      // 1. Aktuelles Bild (höchste Priorität)
+      order.push(currentImageIndex);
+      visited.add(currentImageIndex);
+      
+      // 2. Nächste und vorherige Bilder
+      for (let i = 1; i <= Math.min(3, Math.floor(images.length / 2)); i++) {
+        const next = (currentImageIndex + i) % images.length;
+        const prev = (currentImageIndex - i + images.length) % images.length;
+        
+        if (!visited.has(next)) {
+          order.push(next);
+          visited.add(next);
+        }
+        if (!visited.has(prev)) {
+          order.push(prev);
+          visited.add(prev);
+        }
+      }
+      
+      // 3. Alle anderen Bilder
+      for (let i = 0; i < images.length; i++) {
+        if (!visited.has(i)) {
+          order.push(i);
+        }
+      }
+      
+      return order;
+    };
+
+    const priorityOrder = getPriorityOrder();
+    const imagePromises: Promise<void>[] = [];
+
+    // Lade Bilder in Prioritätsreihenfolge mit kleinen Verzögerungen
+    priorityOrder.forEach((index, priorityIndex) => {
+      const imageSrc = images[index];
+      
+      const promise = new Promise<void>((resolve) => {
+        // Kleine Verzögerung für nicht-prioritäre Bilder
+        const delay = priorityIndex < 5 ? 0 : priorityIndex * 50;
+        
+        setTimeout(() => {
+          const img = new window.Image();
+          
+          img.onload = () => {
+            loadedCount++;
+            setPreloadedImages(prev => new Set(prev).add(index));
+            setLoadingProgress((loadedCount / images.length) * 100);
+            
+            const priority = priorityIndex < 5 ? '🔥' : '📄';
+            console.log(`${priority} Bild ${index + 1}/${images.length} geladen (Priorität ${priorityIndex + 1}): ${imageSrc}`);
+            resolve();
+          };
+          
+          img.onerror = () => {
+            loadedCount++;
+            setLoadingProgress((loadedCount / images.length) * 100);
+            console.log(`❌ Fehler beim Laden von Bild ${index + 1}: ${imageSrc}`);
+            resolve(); // Auch bei Fehlern weitermachen
+          };
+          
+          img.src = imageSrc;
+        }, delay);
+      });
+      
+      imagePromises.push(promise);
+    });
+
+    // Alle Bilder laden
+    Promise.all(imagePromises).then(() => {
+      console.log(`🎉 Alle ${images.length} Bilder erfolgreich preloaded! Umblättern ist jetzt blitzschnell! ⚡`);
+    });
+
+    // Cleanup function
+    return () => {
+      setPreloadedImages(new Set());
+      setLoadingProgress(0);
+    };
+  }, [images, currentImageIndex]);
 
   const nextImage = useCallback(() => {
     setCurrentImageIndex((prev) => (prev + 1) % images.length);
@@ -302,7 +396,8 @@ export default function SongDetail({ song, onBack, onHome }: SongDetailProps) {
                       alignItems: 'center',
                       justifyContent: 'center',
                       flexShrink: 0,
-                      boxShadow: index === currentImageIndex ? '0 4px 15px rgba(255,255,255,0.3)' : 'none'
+                      boxShadow: index === currentImageIndex ? '0 4px 15px rgba(255,255,255,0.3)' : 'none',
+                      position: 'relative'
                     }}
                     title={`Seite ${index + 1} ${index === currentImageIndex ? '(aktuell)' : ''}`}
                     onMouseEnter={(e) => {
@@ -367,6 +462,35 @@ export default function SongDetail({ song, onBack, onHome }: SongDetailProps) {
         </div>
       </div>
       
+      {/* Preloading Indikator */}
+      {loadingProgress < 100 && hasMultipleImages && (
+        <div className="flex-shrink-0 px-4 py-2" style={{ background: 'rgba(0,0,0,0.8)' }}>
+          <div className="d-flex align-items-center justify-content-center" style={{ gap: '15px' }}>
+            <span className="text-white" style={{ fontSize: '0.9rem', minWidth: '140px' }}>
+              Lade Bilder... {Math.round(loadingProgress)}%
+            </span>
+            <div style={{ 
+              width: '200px', 
+              height: '8px', 
+              background: '#333', 
+              borderRadius: '4px',
+              overflow: 'hidden'
+            }}>
+              <div style={{ 
+                width: `${loadingProgress}%`, 
+                height: '100%', 
+                background: 'linear-gradient(90deg, #4CAF50, #66BB6A)',
+                borderRadius: '4px',
+                transition: 'width 0.3s ease'
+              }} />
+            </div>
+            <span className="text-white" style={{ fontSize: '0.8rem', opacity: 0.8 }}>
+              {preloadedImages.size}/{images.length}
+            </span>
+          </div>
+        </div>
+      )}
+      
       {/* Bild-Container - zentriert mit kompaktem Layout */}
       <div 
         ref={containerRef}
@@ -406,10 +530,43 @@ export default function SongDetail({ song, onBack, onHome }: SongDetailProps) {
               filter: 'drop-shadow(0 2px 4px rgba(255,255,255,0.05))',
               borderRadius: '4px',
               display: 'block',
-              margin: '0 auto'
+              margin: '0 auto',
+              // Übergang für smooth loading bei preloaded images
+              opacity: preloadedImages.has(currentImageIndex) ? 1 : 0.8,
+              transition: 'opacity 0.1s ease'
             }}
-            priority
+            priority={currentImageIndex === 0} // Erste Seite hat Priority
+            placeholder="blur"
+            blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAAIAAoDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAhEAACAQMDBQAAAAAAAAAAAAABAgMABAUGIWGRkqGx0f/EABUBAQEAAAAAAAAAAAAAAAAAAAMF/8QAGhEAAgIDAAAAAAAAAAAAAAAAAAECEgMRkf/aAAwDAQACEQMRAD8AltJagyeH0AthI5xdrLcNM91BF5pX2HaH9bcfaSXWGaRmknyLli5i3Aw6p3XS59OOuuxJaajjzRwgSXq4q71/wE0fDXXOe2IiKAAAAAA//2Q=="
           />
+          
+          {/* Unsichtbare Preloading-Bilder für bessere Performance */}
+          {hasMultipleImages && (
+            <div style={{ position: 'absolute', opacity: 0, pointerEvents: 'none', zIndex: -1 }}>
+              {/* Lade das nächste und vorherige Bild unsichtbar vor */}
+              {images.map((imageSrc, index) => {
+                // Nur die nächsten 2 und vorherigen 2 Bilder preloaden für bessere Performance
+                const isNearby = Math.abs(index - currentImageIndex) <= 2 || 
+                                 (currentImageIndex === 0 && index >= images.length - 2) ||
+                                 (currentImageIndex >= images.length - 2 && index <= 2);
+                
+                if (index !== currentImageIndex && isNearby) {
+                  return (
+                    <Image
+                      key={`preload-${index}`}
+                      src={imageSrc}
+                      alt=""
+                      width={1200}
+                      height={900}
+                      style={{ display: 'none' }}
+                      priority={false}
+                    />
+                  );
+                }
+                return null;
+              })}
+            </div>
+          )}
         </div>
         
         {/* Footer mit Tastatursteuerung - direkt unter dem Bild */}
