@@ -106,7 +106,7 @@ export default function SongDetail({ song, onBack, onHome }: SongDetailProps) {
         <div className="d-flex justify-content-between align-items-center" style={{ width: '100%' }}>
           {/* Linke Spalte: Titel */}
           <div className="flex-grow-1">
-            <h1 className="mb-0 text-white" style={{ fontSize: '2rem', fontWeight: '300', color: '#f8f9fa' }}>
+            <h1 className="mb-0 text-white song-detail-title" style={{ fontSize: '2rem', fontWeight: '300', color: '#f8f9fa' }}>
               {song.title}
             </h1>
           </div>
@@ -116,7 +116,7 @@ export default function SongDetail({ song, onBack, onHome }: SongDetailProps) {
             {/* Home-Button */}
             <button 
               onClick={() => onHome && onHome()}
-              className="btn btn-lg text-white"
+              className="btn btn-lg text-white song-detail-nav-button"
               style={{ 
                 background: '#3a3a3a',
                 border: '2px solid #5a5a5a',
@@ -152,7 +152,7 @@ export default function SongDetail({ song, onBack, onHome }: SongDetailProps) {
             {/* Zurück-Button */}
             <button 
               onClick={onBack}
-              className="btn btn-lg text-white"
+              className="btn btn-lg text-white song-detail-nav-button"
               style={{ 
                 background: '#4a4a4a',
                 border: '2px solid #6a6a6a',
@@ -191,7 +191,7 @@ export default function SongDetail({ song, onBack, onHome }: SongDetailProps) {
                 {/* Linker Pfeil */}
                 <button 
                   onClick={prevImage}
-                  className="btn btn-lg text-white"
+                  className="btn btn-lg text-white song-detail-arrow-button"
                   style={{ 
                     background: '#6a6a6a',
                     border: '2px solid #8a8a8a',
@@ -229,7 +229,7 @@ export default function SongDetail({ song, onBack, onHome }: SongDetailProps) {
                   <button
                     key={index}
                     onClick={() => setCurrentImageIndex(index)}
-                    className={`btn btn-lg ${index === currentImageIndex ? '' : 'text-white'}`}
+                    className={`btn btn-lg song-detail-page-button ${index === currentImageIndex ? '' : 'text-white'}`}
                     style={{ 
                       background: index === currentImageIndex ? '#ffffff' : '#6a6a6a',
                       border: `3px solid ${index === currentImageIndex ? '#ffffff' : '#8a8a8a'}`,
@@ -272,7 +272,7 @@ export default function SongDetail({ song, onBack, onHome }: SongDetailProps) {
                 {/* Rechter Pfeil */}
                 <button 
                   onClick={nextImage}
-                  className="btn btn-lg text-white"
+                  className="btn btn-lg text-white song-detail-arrow-button"
                   style={{ 
                     background: '#6a6a6a',
                     border: '2px solid #8a8a8a',

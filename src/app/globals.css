@@ -75,3 +75,134 @@ a {
     color-scheme: dark;
   }
 }
+
+/* Responsive Styles für Mobile und Tablet */
+
+/* Mobile Phones (bis 768px) */
+@media (max-width: 768px) {
+  /* Song List Buttons */
+  .song-button {
+    width: calc(50% - 10px) !important; /* 2 Buttons pro Reihe auf Mobile */
+    height: 80px !important; /* Kleinere Höhe */
+    font-size: 0.9rem !important;
+    margin: 3px !important;
+    padding: 8px 12px !important;
+  }
+  
+  .song-button-text {
+    font-size: 1.1rem !important;
+    max-width: 140px !important;
+    -webkit-line-clamp: 2 !important; /* Max 2 Zeilen auf Mobile */
+    line-clamp: 2 !important; /* Standard property for compatibility */
+  }
+  
+  /* Letter Navigation Buttons */
+  .letter-button {
+    width: 35px !important;
+    height: 35px !important;
+    font-size: 0.9rem !important;
+    margin: 2px !important;
+  }
+  
+  /* Song Detail Navigation */
+  .song-detail-nav-button {
+    width: 50px !important;
+    height: 50px !important;
+    font-size: 0.7rem !important;
+  }
+  
+  .song-detail-arrow-button {
+    width: 50px !important;
+    height: 50px !important;
+    font-size: 1.2rem !important;
+  }
+  
+  .song-detail-page-button {
+    width: 50px !important;
+    height: 50px !important;
+    font-size: 1rem !important;
+  }
+  
+  /* Header Title */
+  .song-detail-title {
+    font-size: 1.3rem !important;
+  }
+  
+  /* Login Form */
+  .login-card {
+    min-width: 300px !important;
+    padding: 25px !important;
+  }
+  
+  .login-title {
+    font-size: 2.5rem !important;
+  }
+}
+
+/* Tablets (769px bis 1024px) */
+@media (min-width: 769px) and (max-width: 1024px) {
+  /* Song List Buttons */
+  .song-button {
+    width: calc(33.333% - 10px) !important; /* 3 Buttons pro Reihe auf Tablet */
+    height: 90px !important;
+    font-size: 1rem !important;
+  }
+  
+  .song-button-text {
+    font-size: 1.3rem !important;
+    max-width: 180px !important;
+  }
+  
+  /* Letter Navigation Buttons */
+  .letter-button {
+    width: 40px !important;
+    height: 40px !important;
+    font-size: 1rem !important;
+  }
+  
+  /* Song Detail Navigation */
+  .song-detail-nav-button {
+    width: 60px !important;
+    height: 60px !important;
+    font-size: 0.8rem !important;
+  }
+  
+  .song-detail-arrow-button {
+    width: 60px !important;
+    height: 60px !important;
+    font-size: 1.4rem !important;
+  }
+  
+  .song-detail-page-button {
+    width: 60px !important;
+    height: 60px !important;
+    font-size: 1.2rem !important;
+  }
+  
+  /* Header Title */
+  .song-detail-title {
+    font-size: 1.6rem !important;
+  }
+  
+  /* Login Form */
+  .login-card {
+    min-width: 350px !important;
+    padding: 35px !important;
+  }
+  
+  .login-title {
+    font-size: 3rem !important;
+  }
+}
+
+/* Touch-friendly hover effects for mobile */
+@media (hover: none) and (pointer: coarse) {
+  button:hover {
+    transform: none !important;
+    box-shadow: none !important;
+  }
+  
+  button:active {
+    transform: scale(0.95) !important;
+  }
+}

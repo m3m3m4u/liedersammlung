@@ -282,7 +282,7 @@ export default function SongList() {
                 {songsForLetter.map((song) => (
                   <button
                     key={song._id}
-                    className="btn btn-lg text-white"
+                    className="btn btn-lg text-white song-button"
                     style={{ 
                       background: '#6a6a6a',
                       border: '2px solid #8a8a8a',
@@ -318,19 +318,21 @@ export default function SongList() {
                       e.currentTarget.style.boxShadow = 'none';
                     }}
                   >
-                    <div style={{ 
-                      fontSize: song.title.length < 15 ? '1.5rem' : song.title.length <= 25 ? '1.7rem' : '1.3rem', // Angepasste Schriftgrößen: kurz kleiner, mittel und lang größer
-                      fontWeight: 'bold', // Fettgedruckter Text
-                      lineHeight: '1.3', // Bessere Zeilenhöhe
-                      overflow: 'hidden', 
-                      textOverflow: 'ellipsis', 
-                      whiteSpace: 'normal', // Erlaubt Zeilenumbruch
-                      maxWidth: '240px', // 20% breiter: 200px * 1.2 = 240px
-                      wordBreak: 'break-word', // Bricht lange Wörter um
-                      display: '-webkit-box',
-                      WebkitLineClamp: 3, // Maximal 3 Zeilen statt 2
-                      WebkitBoxOrient: 'vertical'
-                    }}>
+                    <div 
+                      className="song-button-text"
+                      style={{ 
+                        fontSize: song.title.length < 15 ? '1.5rem' : song.title.length <= 25 ? '1.7rem' : '1.3rem', // Angepasste Schriftgrößen: kurz kleiner, mittel und lang größer
+                        fontWeight: 'bold', // Fettgedruckter Text
+                        lineHeight: '1.3', // Bessere Zeilenhöhe
+                        overflow: 'hidden', 
+                        textOverflow: 'ellipsis', 
+                        whiteSpace: 'normal', // Erlaubt Zeilenumbruch
+                        maxWidth: '240px', // 20% breiter: 200px * 1.2 = 240px
+                        wordBreak: 'break-word', // Bricht lange Wörter um
+                        display: '-webkit-box',
+                        WebkitLineClamp: 3, // Maximal 3 Zeilen statt 2
+                        WebkitBoxOrient: 'vertical'
+                      }}>
                       {formatTitleWithLineBreak(song.title)}
                     </div>
                   </button>
@@ -442,7 +444,7 @@ export default function SongList() {
                 return (
                   <button
                     key={button}
-                    className={`btn btn-lg ${isAvailable ? 'text-white' : 'text-muted'}`}
+                    className={`btn btn-lg letter-button ${isAvailable ? 'text-white' : 'text-muted'}`}
                     style={{ 
                       background: isAvailable ? '#6a6a6a' : '#5a5a5a', // Noch heller gemacht
                       border: `2px solid ${isAvailable ? '#8a8a8a' : '#6a6a6a'}`, // Passend angepasst

@@ -59,7 +59,9 @@ export default function Login({ onLogin }: LoginProps) {
           color: '#f8f9fa',
           marginBottom: '10px',
           textShadow: '0 2px 4px rgba(0,0,0,0.3)'
-        }}>
+        }}
+        className="login-title"
+        >
           🎵 Liedersammlung
         </h1>
         <p style={{ 
@@ -73,7 +75,7 @@ export default function Login({ onLogin }: LoginProps) {
 
       {/* Login Form */}
       <div 
-        className="card" 
+        className="card login-card" 
         style={{ 
           background: 'rgba(255,255,255,0.1)',
           border: '1px solid rgba(255,255,255,0.2)',
