@@ -51,97 +51,42 @@ export default function SongDetail({ song, onBack, onHome }: SongDetailProps) {
     return () => window.removeEventListener('resize', calculateAvailableHeight);
   }, []);
 
-  // Intelligentes Preloading System für alle Bilder
+  // Preloading nur einmalig für alle Bilder (nicht bei jedem Seitenwechsel)
   useEffect(() => {
     if (images.length === 0) return;
 
     let loadedCount = 0;
-    
-    console.log(`🖼️ Starte intelligentes Preloading von ${images.length} Bildern...`);
+    console.log(`🖼️ Starte Preloading von ${images.length} Bildern...`);
 
-    // Prioritätsliste: Aktuelles Bild, dann nächste/vorherige, dann der Rest
-    const getPriorityOrder = () => {
-      const order: number[] = [];
-      const visited = new Set<number>();
-      
-      // 1. Aktuelles Bild (höchste Priorität)
-      order.push(currentImageIndex);
-      visited.add(currentImageIndex);
-      
-      // 2. Nächste und vorherige Bilder
-      for (let i = 1; i <= Math.min(3, Math.floor(images.length / 2)); i++) {
-        const next = (currentImageIndex + i) % images.length;
-        const prev = (currentImageIndex - i + images.length) % images.length;
-        
-        if (!visited.has(next)) {
-          order.push(next);
-          visited.add(next);
-        }
-        if (!visited.has(prev)) {
-          order.push(prev);
-          visited.add(prev);
-        }
-      }
-      
-      // 3. Alle anderen Bilder
-      for (let i = 0; i < images.length; i++) {
-        if (!visited.has(i)) {
-          order.push(i);
-        }
-      }
-      
-      return order;
-    };
-
-    const priorityOrder = getPriorityOrder();
     const imagePromises: Promise<void>[] = [];
-
-    // Lade Bilder in Prioritätsreihenfolge mit kleinen Verzögerungen
-    priorityOrder.forEach((index, priorityIndex) => {
-      const imageSrc = images[index];
-      
+    images.forEach((imageSrc, index) => {
       const promise = new Promise<void>((resolve) => {
-        // Kleine Verzögerung für nicht-prioritäre Bilder
-        const delay = priorityIndex < 5 ? 0 : priorityIndex * 50;
-        
-        setTimeout(() => {
-          const img = new window.Image();
-          
-          img.onload = () => {
-            loadedCount++;
-            setPreloadedImages(prev => new Set(prev).add(index));
-            setLoadingProgress((loadedCount / images.length) * 100);
-            
-            const priority = priorityIndex < 5 ? '🔥' : '📄';
-            console.log(`${priority} Bild ${index + 1}/${images.length} geladen (Priorität ${priorityIndex + 1}): ${imageSrc}`);
-            resolve();
-          };
-          
-          img.onerror = () => {
-            loadedCount++;
-            setLoadingProgress((loadedCount / images.length) * 100);
-            console.log(`❌ Fehler beim Laden von Bild ${index + 1}: ${imageSrc}`);
-            resolve(); // Auch bei Fehlern weitermachen
-          };
-          
-          img.src = imageSrc;
-        }, delay);
+        const img = new window.Image();
+        img.onload = () => {
+          loadedCount++;
+          setPreloadedImages(prev => new Set(prev).add(index));
+          setLoadingProgress((loadedCount / images.length) * 100);
+          resolve();
+        };
+        img.onerror = () => {
+          loadedCount++;
+          setLoadingProgress((loadedCount / images.length) * 100);
+          resolve();
+        };
+        img.src = imageSrc;
       });
-      
       imagePromises.push(promise);
     });
 
-    // Alle Bilder laden
     Promise.all(imagePromises).then(() => {
-      console.log(`🎉 Alle ${images.length} Bilder erfolgreich preloaded! Umblättern ist jetzt blitzschnell! ⚡`);
+      console.log(`🎉 Alle ${images.length} Bilder erfolgreich preloaded!`);
     });
 
-    // Cleanup function
     return () => {
       setPreloadedImages(new Set());
       setLoadingProgress(0);
     };
-  }, [images, currentImageIndex]);
+  }, [images]);
 
   const nextImage = useCallback(() => {
     setCurrentImageIndex((prev) => (prev + 1) % images.length);
