@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { readdir } from 'fs/promises';
+import { readdir, access } from 'fs/promises';
+import { constants } from 'fs';
 import path from 'path';
 
 export async function GET(request: Request) {
@@ -9,9 +10,44 @@ export async function GET(request: Request) {
     
     const baseDir = path.join(process.cwd(), 'public', 'images', type);
     
+    console.log('Current working directory:', process.cwd());
+    console.log('Looking for directory:', baseDir);
+    
+    // Prüfen ob das Verzeichnis existiert
+    try {
+      await access(baseDir, constants.F_OK);
+      console.log('Directory exists:', baseDir);
+    } catch (accessError) {
+      console.error('Directory does not exist:', baseDir);
+      console.error('Access error:', accessError);
+      
+      // Alternative Pfade versuchen
+      const altPath1 = path.join(__dirname, '..', '..', '..', '..', 'public', 'images', type);
+      const altPath2 = path.join(process.cwd(), '..', 'public', 'images', type);
+      
+      console.log('Trying alternative path 1:', altPath1);
+      console.log('Trying alternative path 2:', altPath2);
+      
+      return NextResponse.json(
+        { 
+          error: `Directory not found: ${baseDir}`,
+          debug: {
+            cwd: process.cwd(),
+            baseDir,
+            type,
+            altPath1,
+            altPath2
+          }
+        },
+        { status: 404 }
+      );
+    }
+    
     // Alle Unterordner im entsprechenden Verzeichnis lesen
     const folders = await readdir(baseDir, { withFileTypes: true });
     const songFolders = folders.filter(dirent => dirent.isDirectory());
+    
+    console.log(`Found ${songFolders.length} song folders in ${type}`);
     
     const songs = await Promise.all(
       songFolders.map(async (folder) => {
@@ -40,6 +76,7 @@ export async function GET(request: Request) {
     // Null-Werte herausfiltern (falls ein Ordner nicht lesbar war)
     const validSongs = songs.filter(song => song !== null);
     
+    console.log(`Returning ${validSongs.length} valid songs`);
     return NextResponse.json(validSongs);
   } catch (error) {
     const { searchParams } = new URL(request.url);

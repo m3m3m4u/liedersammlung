@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import Image from 'next/image';
 
 interface SongDetailProps {
@@ -16,6 +16,13 @@ interface SongDetailProps {
 export default function SongDetail({ song, onBack, onHome }: SongDetailProps) {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [availableHeight, setAvailableHeight] = useState(0);
+  
+  // Touch/Swipe functionality
+  const touchStartX = useRef<number>(0);
+  const touchStartY = useRef<number>(0);
+  const touchEndX = useRef<number>(0);
+  const touchEndY = useRef<number>(0);
+  const containerRef = useRef<HTMLDivElement>(null);
   
   const images = song.images || [];
   const hasMultipleImages = images.length > 1;
@@ -49,6 +56,56 @@ export default function SongDetail({ song, onBack, onHome }: SongDetailProps) {
   const prevImage = useCallback(() => {
     setCurrentImageIndex((prev) => (prev - 1 + images.length) % images.length);
   }, [images.length]);
+
+  // Touch/Swipe Handler
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    if (!hasMultipleImages) return;
+    
+    const touch = e.touches[0];
+    touchStartX.current = touch.clientX;
+    touchStartY.current = touch.clientY;
+  }, [hasMultipleImages]);
+
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    if (!hasMultipleImages) return;
+    
+    const touch = e.touches[0];
+    touchEndX.current = touch.clientX;
+    touchEndY.current = touch.clientY;
+  }, [hasMultipleImages]);
+
+  const handleTouchEnd = useCallback(() => {
+    if (!hasMultipleImages) return;
+    
+    const deltaX = touchStartX.current - touchEndX.current;
+    const deltaY = Math.abs(touchStartY.current - touchEndY.current);
+    
+    // Mindest-Swipe-Distanz und maximal erlaubte vertikale Bewegung
+    const minSwipeDistance = 80; // Erhöht für präzisere Gesten
+    const maxVerticalMovement = 120; // Toleranter für diagonale Bewegungen
+    
+    // Nur horizontale Swipes beachten (nicht bei vertikalem Scrollen)
+    if (Math.abs(deltaX) > minSwipeDistance && deltaY < maxVerticalMovement) {
+      // Verhältnis prüfen: horizontale Bewegung sollte dominieren
+      const horizontalToVerticalRatio = Math.abs(deltaX) / (deltaY + 1);
+      
+      if (horizontalToVerticalRatio > 1.5) { // Horizontale Bewegung muss dominieren
+        if (deltaX > 0) {
+          // Swipe nach links = nächstes Bild
+          nextImage();
+        } else {
+          // Swipe nach rechts = vorheriges Bild  
+          prevImage();
+        }
+      }
+    }
+    
+    // Reset touch positions
+    touchStartX.current = 0;
+    touchStartY.current = 0;
+    touchEndX.current = 0;
+    touchEndY.current = 0;
+  }, [hasMultipleImages, nextImage, prevImage]);
 
   // Tastatursteuerung
   useEffect(() => {
@@ -311,22 +368,29 @@ export default function SongDetail({ song, onBack, onHome }: SongDetailProps) {
       </div>
       
       {/* Bild-Container - zentriert mit kompaktem Layout */}
-      <div style={{ 
-        display: 'flex', 
-        flexDirection: 'column',
-        justifyContent: 'center', 
-        alignItems: 'center', 
-        width: '100%',
-        flex: '1',
-        minHeight: '0'
-      }}>
+      <div 
+        ref={containerRef}
+        style={{ 
+          display: 'flex', 
+          flexDirection: 'column',
+          justifyContent: 'center', 
+          alignItems: 'center', 
+          width: '100%',
+          flex: '1',
+          minHeight: '0'
+        }}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+      >
         <div style={{ 
           display: 'flex', 
           justifyContent: 'center', 
           alignItems: 'center',
           width: '100%', 
           textAlign: 'center',
-          marginBottom: '10px'
+          marginBottom: '10px',
+          position: 'relative'
         }}>
           <Image
             key={currentImageIndex}
@@ -352,9 +416,18 @@ export default function SongDetail({ song, onBack, onHome }: SongDetailProps) {
         <div className="flex-shrink-0 d-flex justify-content-center align-items-center px-4" style={{ position: 'relative' }}>
           {/* Tastatursteuerung zentriert */}
           <div style={{ fontSize: '0.9rem', color: '#ffffff', textAlign: 'center' }}>
-            <strong style={{ color: '#ffffff' }}>Steuerung:</strong> ← → = Blättern | ESC = Zurück | H = Home | 1-9 = Direkte Seitenauswahl
+            <strong style={{ color: '#ffffff' }}>Steuerung:</strong> ← → = Blättern | Wischen = Blättern | ESC = Zurück | H = Home | 1-9 = Direkte Seitenauswahl
           </div>
         </div>
+
+        {/* Swipe-Hinweis nur auf Touch-Geräten anzeigen */}
+        {hasMultipleImages && (
+          <div className="d-block d-md-none text-center" style={{ padding: '10px 0 5px 0' }}>
+            <small style={{ fontSize: '0.8rem', color: '#aaaaaa', opacity: 0.8 }}>
+              💡 <strong>Tipp:</strong> Wischen zum Blättern zwischen den Seiten
+            </small>
+          </div>
+        )}
       </div>
       
       {/* Vollbild-Button - fixiert am rechten Rand des Viewports */}
