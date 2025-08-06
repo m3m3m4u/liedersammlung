@@ -226,7 +226,7 @@ export default function SongList() {
           <div className="text-center">
             {songsForLetter.length === 0 ? (
               <div className="text-white">
-                <h4>Keine Songs mit "{selectedLetter}" gefunden</h4>
+                <h4>Keine Songs mit &quot;{selectedLetter}&quot; gefunden</h4>
                 <p className="text-muted">
                   Keine Songs für diesen Buchstaben vorhanden
                 </p>
@@ -279,7 +279,7 @@ export default function SongList() {
                 </div>
 
                 {/* Song-Buttons - 5 pro Zeile */}
-                {songsForLetter.map((song, index) => (
+                {songsForLetter.map((song) => (
                   <button
                     key={song._id}
                     className="btn btn-lg text-white"

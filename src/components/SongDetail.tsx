@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Image from 'next/image';
 
 interface SongDetailProps {
@@ -42,13 +42,13 @@ export default function SongDetail({ song, onBack, onHome }: SongDetailProps) {
     return () => window.removeEventListener('resize', calculateAvailableHeight);
   }, []);
 
-  const nextImage = () => {
+  const nextImage = useCallback(() => {
     setCurrentImageIndex((prev) => (prev + 1) % images.length);
-  };
+  }, [images.length]);
 
-  const prevImage = () => {
+  const prevImage = useCallback(() => {
     setCurrentImageIndex((prev) => (prev - 1 + images.length) % images.length);
-  };
+  }, [images.length]);
 
   // Tastatursteuerung
   useEffect(() => {
@@ -82,7 +82,7 @@ export default function SongDetail({ song, onBack, onHome }: SongDetailProps) {
     return () => {
       window.removeEventListener('keydown', handleKeyPress);
     };
-  }, [hasMultipleImages, onBack]);
+  }, [hasMultipleImages, onBack, nextImage, prevImage]);
 
   if (images.length === 0) {
     return (
