@@ -31,7 +31,7 @@ export default function SongList() {
       const res = await fetch(`/api/songs?type=${contentType}&minimal=1`);
       if (!res.ok) throw new Error('Fetch fehlgeschlagen');
   const data: CleanSong[] = await res.json();
-  setSongs(data.map(s => ({ _id: s._id, title: s.title, folder: (s as any).folder, images: s.images, videoUrl: s.videoUrl })));
+  setSongs(data.map(s => ({ _id: s._id, title: s.title, folder: s.folder, images: s.images, videoUrl: s.videoUrl })));
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Unbekannter Fehler');
     } finally {

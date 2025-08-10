@@ -2,6 +2,13 @@ import { NextResponse } from 'next/server';
 import { isWebdavEnabled, getWebdavClient } from '@/lib/webdav';
 import { getSongsCollection, getVideoCollection, validateMongoUri } from '@/lib/mongo';
 
+function safeErrorMessage(err: unknown): string {
+  if (err && typeof err === 'object' && 'message' in err && typeof (err as { message: unknown }).message === 'string') {
+    return (err as { message: string }).message;
+  }
+  return 'error';
+}
+
 export async function GET() {
   const webdav = isWebdavEnabled();
   let webdavOk: boolean | string = false;
@@ -10,8 +17,8 @@ export async function GET() {
       const client = getWebdavClient();
       await client.getDirectoryContents('/');
       webdavOk = true;
-    } catch (e:any) {
-      webdavOk = e.message || 'error';
+    } catch (e) {
+      webdavOk = safeErrorMessage(e) || 'error';
     }
   }
   let dbOk: boolean | string = false;
@@ -19,11 +26,11 @@ export async function GET() {
   if (uriIssue) {
     dbOk = uriIssue;
   } else {
-    try {
+  try {
       const songsCol = await getSongsCollection();
       const videosCol = await getVideoCollection();
       if (songsCol || videosCol) dbOk = true; else dbOk = 'no collections';
-    } catch (e:any) { dbOk = e.message || 'error'; }
+  } catch (e) { dbOk = safeErrorMessage(e); }
   }
   return NextResponse.json({ webdavEnabled: webdav, webdavOk, dbOk });
 }

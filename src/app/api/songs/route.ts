@@ -69,9 +69,10 @@ export async function GET(request: Request) {
   }
     
   if (type === 'noten' || type === 'texte') {
-      const songsCol = await getSongsCollection();
-      // Helper zum Konstruieren finaler JSON Antwort
-      const buildResponse = (docs: any[]) => {
+  const songsCol = await getSongsCollection();
+  interface SongDocLite { _id?: unknown; category: 'noten' | 'texte'; folder: string; title: string; images?: string[]; createdAt?: Date; updatedAt?: Date; imageCount?: number; }
+  // Helper zum Konstruieren finaler JSON Antwort
+  const buildResponse = (docs: SongDocLite[]) => {
         const publicBase = buildPublicUrl('');
         return docs.map(d => {
           const imgs = (d.images || []) as string[];
@@ -136,7 +137,7 @@ export async function GET(request: Request) {
           let baseUsed = bases[0]; let entries: WebDavEntry[] = [];
           for (const b of bases) { try { const r = await client.getDirectoryContents(b).catch(()=>[]) as WebDavEntry[]; if (r.length) { entries=r; baseUsed=b; break; } } catch{} }
           const dirs = entries.filter(e=> e.type==='directory');
-          const docs: any[] = [];
+          const docs: SongDocLite[] = [];
           for (const dir of dirs) {
             const folderPath = `${baseUsed}/${dir.basename}`;
             const files = await client.getDirectoryContents(folderPath).catch(()=>[]) as WebDavEntry[];
@@ -144,7 +145,17 @@ export async function GET(request: Request) {
             docs.push({ category: type, folder: dir.basename, title: dir.basename, images: imgs, createdAt: new Date(), updatedAt: new Date(), imageCount: imgs.length });
           }
           if (songsCol && docs.length) {
-            try { await songsCol.insertMany(docs, { ordered: false }); } catch {/* dupe safe */}
+            try {
+              await songsCol.insertMany(docs.map(d => ({
+                category: d.category,
+                folder: d.folder,
+                title: d.title,
+                images: d.images ?? [],
+                createdAt: d.createdAt ?? new Date(),
+                updatedAt: d.updatedAt ?? new Date(),
+                imageCount: d.imageCount ?? (d.images ? d.images.length : 0)
+              })), { ordered: false });
+            } catch {/* dupe safe */}
           }
           const payload = buildResponse(docs);
           const newest = Math.max(...docs.map(d => new Date(d.updatedAt || d.createdAt || Date.now()).getTime()), 0);

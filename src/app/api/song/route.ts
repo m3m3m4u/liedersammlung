@@ -3,7 +3,14 @@ import path from 'path';
 import { getSongsCollection } from '@/lib/mongo';
 import { getWebdavClient, isWebdavEnabled, buildPublicUrl, IMAGE_EXTENSIONS } from '@/lib/webdav';
 
-interface WebDavEntry { type: string; basename: string; [k: string]: any; }
+interface WebDavEntry { type: string; basename: string; }
+
+function safeError(err: unknown): string {
+  if (err && typeof err === 'object' && 'message' in err && typeof (err as { message: unknown }).message === 'string') {
+    return (err as { message: string }).message;
+  }
+  return 'error';
+}
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -68,7 +75,7 @@ export async function GET(request: Request) {
       }
     }
     return NextResponse.json({ error: 'not found' }, { status: 404 });
-  } catch (e:any) {
-    return NextResponse.json({ error: e.message || 'error' }, { status: 500 });
+  } catch (e) {
+    return NextResponse.json({ error: safeError(e) }, { status: 500 });
   }
 }
