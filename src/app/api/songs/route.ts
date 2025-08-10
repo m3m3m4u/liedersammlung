@@ -43,8 +43,8 @@ export async function GET(request: Request) {
             return { _id: f.basename.replace('.json','').toLowerCase().replace(/\s+/g,'-'), title: data.title || f.basename.replace('.json',''), videoUrl: data.url };
           } catch { return null; }
         }));
-        const filtered = videos.filter(Boolean) as any[];
-        if (filtered.length) return NextResponse.json(filtered);
+  const filtered = videos.filter((v): v is { _id: string; title: string; videoUrl: string } => Boolean(v));
+  if (filtered.length) return NextResponse.json(filtered);
       } catch (e) {
         console.error('Video WebDAV Listing Fehler:', e);
       }
