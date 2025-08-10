@@ -23,11 +23,33 @@ export async function GET(request: Request) {
     if (collection) {
       try {
         const docs = await collection.find({}, { sort: { title: 1 } }).toArray();
-        return NextResponse.json(docs.map(d => ({ _id: d.slug, title: d.title, videoUrl: d.url })));
+        if (docs.length) {
+          return NextResponse.json(docs.map(d => ({ _id: d.slug, title: d.title, videoUrl: d.url })));
+        }
       } catch (e) {
         console.error('Video DB Query Fehler:', e);
       }
     }
+    // Fallback: WebDAV /videos (falls DB leer oder nicht verfügbar)
+    if (isWebdavEnabled()) {
+      try {
+        const client = getWebdavClient();
+        const entries = await client.getDirectoryContents('/videos').catch(() => []) as WebDavEntry[];
+        const jsonFiles = entries.filter(e => e.type === 'file' && e.basename.endsWith('.json'));
+        const videos = await Promise.all(jsonFiles.map(async f => {
+          try {
+            const raw = await client.getFileContents(`/videos/${f.basename}`, { format: 'text' }) as string;
+            const data = JSON.parse(raw);
+            return { _id: f.basename.replace('.json','').toLowerCase().replace(/\s+/g,'-'), title: data.title || f.basename.replace('.json',''), videoUrl: data.url };
+          } catch { return null; }
+        }));
+        const filtered = videos.filter(Boolean) as any[];
+        if (filtered.length) return NextResponse.json(filtered);
+      } catch (e) {
+        console.error('Video WebDAV Listing Fehler:', e);
+      }
+    }
+    // Letzter Fallback: lokales public/videos
     const videosDir = path.join(process.cwd(), 'public', 'videos');
     try { await access(videosDir, constants.F_OK); } catch { return NextResponse.json([]); }
     try {
