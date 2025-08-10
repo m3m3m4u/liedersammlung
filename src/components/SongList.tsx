@@ -24,18 +24,44 @@ export default function SongList() {
   useEffect(() => { setIsAuthenticated(localStorage.getItem('notenverwaltung_authenticated') === 'true'); }, []);
   useEffect(() => { if (!isAuthenticated) { setKeyboardEnabled(false); return; } const t = setTimeout(() => setKeyboardEnabled(true), 300); return () => clearTimeout(t); }, [isAuthenticated]);
 
-  const fetchSongs = useCallback(async () => {
+  const fetchSongsFull = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/songs?type=${contentType}`);
+      if (!res.ok) throw new Error('Fetch fehlgeschlagen (full)');
+      const full = await res.json();
+      setSongs(full);
+    } catch (e) {
+      console.warn('Full Song Fetch Fehler', e);
+    }
+  }, [contentType]);
+
+  const fetchSongsFast = useCallback(async () => {
+    if (contentType === 'videos') {
+      // Für Videos direkt Full (kleine Menge)
+      await fetchSongsFull();
+      setLoading(false); return;
+    }
     try {
       setLoading(true);
-      const res = await fetch(`/api/songs?type=${contentType}`);
-      if (!res.ok) throw new Error('Fetch fehlgeschlagen');
-      setSongs(await res.json());
+      // Schneller Metadaten-Call
+      const fastRes = await fetch(`/api/cache-songs?category=${contentType}`);
+      if (fastRes.ok) {
+        const data = await fastRes.json();
+        // map zu CleanSong ohne images
+        const minimal: CleanSong[] = (data.songs || []).map((s: any) => ({ _id: s.folder.toLowerCase().replace(/\s+/g,'-'), title: s.title }));
+        setSongs(minimal);
+      }
       setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Unbekannter Fehler');
-    } finally { setLoading(false); }
-  }, [contentType]);
-  useEffect(() => { if (isAuthenticated) fetchSongs(); }, [isAuthenticated, contentType, fetchSongs]);
+    } finally {
+      setLoading(false);
+      // Hintergrund: vollständige Daten nachladen
+      fetchSongsFull();
+    }
+  }, [contentType, fetchSongsFull]);
+
+  useEffect(() => { if (isAuthenticated) fetchSongsFast(); }, [isAuthenticated, contentType, fetchSongsFast]);
 
   const songsForLetter = useCallback((letter: string) => {
     const list = letter === '1' ? songs.filter(s => /^\d/.test(s.title)) : songs.filter(s => s.title.toUpperCase().startsWith(letter));
@@ -75,8 +101,8 @@ export default function SongList() {
       </div>
     </div> ); }
   const avail = availableLetters();
-  if (loading) return <div className="d-flex justify-content-center align-items-center" style={{ height: '100vh', background: '#1a1a1a', color: '#fff' }}>Lade Songs...</div>;
-  if (error) return <div className="d-flex justify-content-center align-items-center" style={{ height: '100vh', background: '#1a1a1a', color: '#fff' }}><div className="text-center"><h3 className="text-danger">Fehler</h3><p>{error}</p><button className="btn btn-primary" onClick={fetchSongs}>Erneut</button></div></div>;
+  if (loading && songs.length === 0) return <div className="d-flex justify-content-center align-items-center" style={{ height: '100vh', background: '#1a1a1a', color: '#fff' }}>Lade Songs...</div>;
+  if (error) return <div className="d-flex justify-content-center align-items-center" style={{ height: '100vh', background: '#1a1a1a', color: '#fff' }}><div className="text-center"><h3 className="text-danger">Fehler</h3><p>{error}</p><button className="btn btn-primary" onClick={fetchSongsFast}>Erneut</button></div></div>;
   return (
     <div className="d-flex flex-column" style={{ height: '100vh', background: '#1a1a1a' }}>
       <div className="flex-shrink-0 px-4 text-center text-white" style={{ paddingTop: 60, paddingBottom: 20 }}>
