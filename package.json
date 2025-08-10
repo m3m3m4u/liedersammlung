@@ -8,7 +8,8 @@
   "start": "next start",
   "lint": "next lint",
   "migrate:webdav": "cross-env DOTENV_CONFIG_PATH=.env.local node -r dotenv/config scripts/migrate-webdav.js",
-  "migrate:videos": "cross-env DOTENV_CONFIG_PATH=.env.local node -r dotenv/config scripts/migrate-videos-to-mongo.js"
+  "migrate:videos": "cross-env DOTENV_CONFIG_PATH=.env.local node -r dotenv/config scripts/migrate-videos-to-mongo.js",
+  "migrate:legacy-noten": "cross-env DOTENV_CONFIG_PATH=.env.local node scripts/migrate-legacy-noten-root.js"
   },
   "dependencies": {
     "adm-zip": "^0.5.16",
