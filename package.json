@@ -5,22 +5,30 @@
   "scripts": {
     "dev": "next dev --turbopack",
     "build": "next build",
-    "start": "next start",
-    "lint": "next lint"
+  "start": "next start",
+  "lint": "next lint",
+  "migrate:webdav": "cross-env DOTENV_CONFIG_PATH=.env.local node -r dotenv/config scripts/migrate-webdav.js",
+  "migrate:videos": "cross-env DOTENV_CONFIG_PATH=.env.local node -r dotenv/config scripts/migrate-videos-to-mongo.js"
   },
   "dependencies": {
+    "adm-zip": "^0.5.16",
     "bootstrap": "^5.3.7",
+  "webdav": "^5.6.0",
     "next": "15.4.5",
     "react": "19.1.0",
-    "react-dom": "19.1.0"
+  "react-dom": "19.1.0",
+  "mongodb": "^6.8.0"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
+    "@types/adm-zip": "^0.5.7",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "15.4.5",
-    "typescript": "^5"
+  "typescript": "^5",
+  "dotenv": "^16.4.5",
+  "cross-env": "^7.0.3"
   }
 }

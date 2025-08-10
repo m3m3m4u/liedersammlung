@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import Image from 'next/image';
 
 interface SongDetailProps {
@@ -17,7 +17,7 @@ export default function SongDetail({ song, onBack, onHome }: SongDetailProps) {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [availableHeight, setAvailableHeight] = useState(0);
   const [preloadedImages, setPreloadedImages] = useState<Set<number>>(new Set());
-  const [loadingProgress, setLoadingProgress] = useState(0);
+  // Fortschritt entfernt (nicht genutzt im UI) – kann bei Bedarf wieder angezeigt werden
   
   // Touch/Swipe functionality
   const touchStartX = useRef<number>(0);
@@ -26,7 +26,7 @@ export default function SongDetail({ song, onBack, onHome }: SongDetailProps) {
   const touchEndY = useRef<number>(0);
   const containerRef = useRef<HTMLDivElement>(null);
   
-  const images = song.images || [];
+  const images = useMemo(() => song.images || [], [song.images]);
   const hasMultipleImages = images.length > 1;
 
   // Verfügbare Höhe messen
@@ -51,40 +51,47 @@ export default function SongDetail({ song, onBack, onHome }: SongDetailProps) {
     return () => window.removeEventListener('resize', calculateAvailableHeight);
   }, []);
 
-  // Preloading nur einmalig für alle Bilder (nicht bei jedem Seitenwechsel)
+  // Intelligentes Preloading: Erstes Bild sofort, andere im Hintergrund
   useEffect(() => {
     if (images.length === 0) return;
 
-    let loadedCount = 0;
-    console.log(`🖼️ Starte Preloading von ${images.length} Bildern...`);
+  console.log(`🖼️ Starte sofortiges Laden des ersten Bildes, dann Hintergrund-Preloading...`);
 
-    const imagePromises: Promise<void>[] = [];
-    images.forEach((imageSrc, index) => {
+    // Erstes Bild sofort als geladen markieren (Next.js Image Component lädt es)
+  setPreloadedImages(new Set([0]));
+
+    // Andere Bilder im Hintergrund laden (ab Index 1)
+    const backgroundPromises: Promise<void>[] = [];
+    for (let index = 1; index < images.length; index++) {
+      const imageSrc = images[index];
+      
       const promise = new Promise<void>((resolve) => {
-        const img = new window.Image();
-        img.onload = () => {
-          loadedCount++;
-          setPreloadedImages(prev => new Set(prev).add(index));
-          setLoadingProgress((loadedCount / images.length) * 100);
-          resolve();
-        };
-        img.onerror = () => {
-          loadedCount++;
-          setLoadingProgress((loadedCount / images.length) * 100);
-          resolve();
-        };
-        img.src = imageSrc;
+        // Verzögerung für Hintergrund-Loading, damit UI responsive bleibt
+        setTimeout(() => {
+          const img = new window.Image();
+          img.onload = () => {
+            setPreloadedImages(prev => new Set(prev).add(index));
+            // Fortschritt optional
+            console.log(`✅ Hintergrund-Bild ${index + 1}/${images.length} geladen`);
+            resolve();
+          };
+          img.onerror = () => {
+            // Fortschritt optional
+            console.log(`❌ Fehler bei Bild ${index + 1}`);
+            resolve();
+          };
+          img.src = imageSrc;
+        }, index * 100); // Gestaffelte Verzögerung
       });
-      imagePromises.push(promise);
-    });
+      backgroundPromises.push(promise);
+    }
 
-    Promise.all(imagePromises).then(() => {
-      console.log(`🎉 Alle ${images.length} Bilder erfolgreich preloaded!`);
+    Promise.all(backgroundPromises).then(() => {
+      console.log(`🎉 Alle ${images.length} Bilder erfolgreich geladen! App ist bereit! ⚡`);
     });
 
     return () => {
       setPreloadedImages(new Set());
-      setLoadingProgress(0);
     };
   }, [images]);
 
@@ -406,35 +413,6 @@ export default function SongDetail({ song, onBack, onHome }: SongDetailProps) {
           </div>
         </div>
       </div>
-      
-      {/* Preloading Indikator */}
-      {loadingProgress < 100 && hasMultipleImages && (
-        <div className="flex-shrink-0 px-4 py-2" style={{ background: 'rgba(0,0,0,0.8)' }}>
-          <div className="d-flex align-items-center justify-content-center" style={{ gap: '15px' }}>
-            <span className="text-white" style={{ fontSize: '0.9rem', minWidth: '140px' }}>
-              Lade Bilder... {Math.round(loadingProgress)}%
-            </span>
-            <div style={{ 
-              width: '200px', 
-              height: '8px', 
-              background: '#333', 
-              borderRadius: '4px',
-              overflow: 'hidden'
-            }}>
-              <div style={{ 
-                width: `${loadingProgress}%`, 
-                height: '100%', 
-                background: 'linear-gradient(90deg, #4CAF50, #66BB6A)',
-                borderRadius: '4px',
-                transition: 'width 0.3s ease'
-              }} />
-            </div>
-            <span className="text-white" style={{ fontSize: '0.8rem', opacity: 0.8 }}>
-              {preloadedImages.size}/{images.length}
-            </span>
-          </div>
-        </div>
-      )}
       
       {/* Bild-Container - zentriert mit kompaktem Layout */}
       <div 

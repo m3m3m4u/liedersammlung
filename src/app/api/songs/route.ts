@@ -1,13 +1,115 @@
 import { NextResponse } from 'next/server';
-import { readdir, access } from 'fs/promises';
+import { readdir, access, readFile } from 'fs/promises';
 import { constants } from 'fs';
 import path from 'path';
+import { getWebdavClient, isWebdavEnabled, buildPublicUrl, IMAGE_EXTENSIONS } from '../../../lib/webdav';
+import { getVideoCollection, getSongsCollection } from '../../../lib/mongo';
+
+// Typisierung für WebDAV Einträge (minimale Felder, Rest generisch)
+interface WebDavEntry {
+  type: string;
+  basename: string;
+  [key: string]: unknown;
+}
 
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const type = searchParams.get('type') || 'texte'; // Default: texte
     
+  // Für Videos verwenden wir ein anderes Verzeichnis und JSON-Dateien
+  if (type === 'videos') {
+    const collection = await getVideoCollection();
+    if (collection) {
+      try {
+        const docs = await collection.find({}, { sort: { title: 1 } }).toArray();
+        return NextResponse.json(docs.map(d => ({ _id: d.slug, title: d.title, videoUrl: d.url })));
+      } catch (e) {
+        console.error('Video DB Query Fehler:', e);
+      }
+    }
+    const videosDir = path.join(process.cwd(), 'public', 'videos');
+    try { await access(videosDir, constants.F_OK); } catch { return NextResponse.json([]); }
+    try {
+      const files = await readdir(videosDir);
+      const jsonFiles = files.filter(f => f.endsWith('.json'));
+      const videos = await Promise.all(jsonFiles.map(async f => {
+        try {
+          const filePath = path.join(videosDir, f);
+          const raw = await readFile(filePath, 'utf-8');
+          const data = JSON.parse(raw);
+          return { _id: f.replace('.json','').toLowerCase().replace(/\s+/g,'-'), title: data.title || f.replace('.json',''), videoUrl: data.url };
+        } catch { return null; }
+      }));
+      return NextResponse.json(videos.filter(Boolean));
+    } catch { return NextResponse.json([]); }
+  }
+    
+    if (type === 'noten' || type === 'texte') {
+      // Erst DB versuchen
+      const songsCol = await getSongsCollection();
+      if (songsCol) {
+        try {
+          const docs = await songsCol.find({ category: type as 'noten' | 'texte' }).sort({ title: 1 }).toArray();
+          if (docs.length) {
+            // URLs konstruieren: Bei WebDAV über public URL oder Proxy, bei lokal /images Pfad
+            const publicBase = buildPublicUrl('');
+            const result = docs.map(d => {
+              let images: string[];
+              if (isWebdavEnabled()) {
+                images = d.images.map(img => {
+                  const relative = `${type}/${d.folder}/${img}`;
+                  return publicBase ? buildPublicUrl(relative)! : `/api/webdav-file?path=${encodeURIComponent(relative)}`;
+                });
+              } else {
+                images = d.images.map(img => `/images/${type}/${d.folder}/${img}`);
+              }
+              return { _id: d.folder.toLowerCase().replace(/\s+/g,'-'), title: d.title, images };
+            });
+            return NextResponse.json(result);
+          }
+        } catch (e) {
+          console.error('Song DB Query Fehler:', e);
+        }
+      }
+    }
+
+    if (isWebdavEnabled() && (type === 'noten' || type === 'texte')) {
+      try {
+    const client = getWebdavClient();
+    const baseDir = `/${type}`;
+    const entries = await client.getDirectoryContents(baseDir).catch(() => []) as WebDavEntry[];
+    const folderEntries = entries.filter((e: WebDavEntry) => e.type === 'directory');
+    const songs = await Promise.all(folderEntries.map(async (folder: WebDavEntry) => {
+          try {
+            const folderPath = `${baseDir}/${folder.basename}`;
+      const files = await client.getDirectoryContents(folderPath).catch(() => []) as WebDavEntry[];
+            const imageFiles = files
+              .filter(f => f.type === 'file' && IMAGE_EXTENSIONS.includes(path.extname(f.basename).toLowerCase()))
+              .sort((a, b) => a.basename.localeCompare(b.basename));
+            const publicBase = buildPublicUrl('');
+            const images = imageFiles.map(f => {
+              const relative = `${type}/${folder.basename}/${f.basename}`;
+              const publicUrl = publicBase ? buildPublicUrl(relative)! : `/api/webdav-file?path=${encodeURIComponent(relative)}`;
+              return publicUrl;
+            });
+            return {
+              _id: folder.basename.toLowerCase().replace(/\s+/g, '-'),
+              title: folder.basename,
+              images,
+            };
+          } catch {
+            return null;
+          }
+        }));
+        return NextResponse.json(songs.filter(Boolean));
+      } catch (e) {
+        console.error('WebDAV Listing Fehler', e);
+        return NextResponse.json([], { status: 200 });
+      }
+    }
+
+  // Fallback lokal (nur wenn nicht WebDAV oder DB leer)
     const baseDir = path.join(process.cwd(), 'public', 'images', type);
     
     console.log('Current working directory:', process.cwd());
