@@ -51,49 +51,46 @@ export default function SongDetail({ song, onBack, onHome }: SongDetailProps) {
     return () => window.removeEventListener('resize', calculateAvailableHeight);
   }, []);
 
-  // Intelligentes Preloading: Erstes Bild sofort, andere im Hintergrund
+  // Zustand: erste Seite vollständig gerendert
+  const [firstPageLoaded, setFirstPageLoaded] = useState(false);
+
+  // Erstes Bild gilt als vorgeladen (Index 0)
   useEffect(() => {
-    if (images.length === 0) return;
+    if (images.length) {
+      setPreloadedImages(new Set([0]));
+    }
+  }, [images]);
 
-  console.log(`🖼️ Starte sofortiges Laden des ersten Bildes, dann Hintergrund-Preloading...`);
+  // Preload aller restlichen Bilder NACHDEM Seite 1 angezeigt wurde
+  useEffect(() => {
+    if (!firstPageLoaded) return; // Warten bis erstes Bild fertig
+    if (images.length <= 1) return;
+    console.log('⚡ Starte Preloading aller weiteren Seiten nach Anzeige der ersten. Anzahl:', images.length - 1);
 
-    // Erstes Bild sofort als geladen markieren (Next.js Image Component lädt es)
-  setPreloadedImages(new Set([0]));
+    let cancelled = false;
+    const loaders: HTMLImageElement[] = [];
 
-    // Andere Bilder im Hintergrund laden (ab Index 1)
-    const backgroundPromises: Promise<void>[] = [];
-    for (let index = 1; index < images.length; index++) {
-      const imageSrc = images[index];
-      
-      const promise = new Promise<void>((resolve) => {
-        // Verzögerung für Hintergrund-Loading, damit UI responsive bleibt
-        setTimeout(() => {
-          const img = new window.Image();
-          img.onload = () => {
-            setPreloadedImages(prev => new Set(prev).add(index));
-            // Fortschritt optional
-            console.log(`✅ Hintergrund-Bild ${index + 1}/${images.length} geladen`);
-            resolve();
-          };
-          img.onerror = () => {
-            // Fortschritt optional
-            console.log(`❌ Fehler bei Bild ${index + 1}`);
-            resolve();
-          };
-          img.src = imageSrc;
-        }, index * 100); // Gestaffelte Verzögerung
-      });
-      backgroundPromises.push(promise);
+    for (let i = 1; i < images.length; i++) {
+      const src = images[i];
+      const img = new window.Image();
+      loaders.push(img);
+      img.onload = () => {
+        if (!cancelled) {
+          setPreloadedImages(prev => {
+            const n = new Set(prev);
+            n.add(i);
+            return n;
+          });
+        }
+      };
+      img.onerror = () => !cancelled && console.log('❌ Fehler beim Laden Seite', i + 1);
+      img.src = src;
     }
 
-    Promise.all(backgroundPromises).then(() => {
-      console.log(`🎉 Alle ${images.length} Bilder erfolgreich geladen! App ist bereit! ⚡`);
-    });
-
     return () => {
-      setPreloadedImages(new Set());
+      cancelled = true;
     };
-  }, [images]);
+  }, [firstPageLoaded, images]);
 
   const nextImage = useCallback(() => {
     setCurrentImageIndex((prev) => (prev + 1) % images.length);
@@ -461,6 +458,11 @@ export default function SongDetail({ song, onBack, onHome }: SongDetailProps) {
             priority={currentImageIndex === 0} // Erste Seite hat Priority
             placeholder="blur"
             blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAAIAAoDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAhEAACAQMDBQAAAAAAAAAAAAABAgMABAUGIWGRkqGx0f/EABUBAQEAAAAAAAAAAAAAAAAAAAMF/8QAGhEAAgIDAAAAAAAAAAAAAAAAAAECEgMRkf/aAAwDAQACEQMRAD8AltJagyeH0AthI5xdrLcNM91BF5pX2HaH9bcfaSXWGaRmknyLli5i3Aw6p3XS59OOuuxJaajjzRwgSXq4q71/wE0fDXXOe2IiKAAAAAA//2Q=="
+            onLoadingComplete={() => {
+              if (currentImageIndex === 0 && !firstPageLoaded) {
+                setFirstPageLoaded(true);
+              }
+            }}
           />
           
           {/* Unsichtbare Preloading-Bilder für bessere Performance */}
