@@ -2,8 +2,11 @@ import { NextResponse } from 'next/server';
 import { getVideoCollection } from '@/lib/mongo';
 import { isWebdavEnabled, getWebdavClient } from '@/lib/webdav';
 
+interface WebDavEntry { type: string; basename: string; [k: string]: unknown }
+interface DebugResult { db: unknown; webdav: unknown; }
+
 export async function GET() {
-  const out: any = { db: null as any, webdav: null as any, local: null as any };
+  const out: DebugResult = { db: null, webdav: null };
   try {
     const col = await getVideoCollection();
     if (col) {
@@ -11,14 +14,19 @@ export async function GET() {
     } else {
       out.db = 'no-db';
     }
-  } catch (e:any) { out.db = { error: e.message }; }
+  } catch (e: unknown) {
+    out.db = { error: e instanceof Error ? e.message : 'unknown error' };
+  }
 
   if (isWebdavEnabled()) {
     try {
       const client = getWebdavClient();
-      const entries = await client.getDirectoryContents('/videos').catch(()=>[]) as any[];
+      const raw = await client.getDirectoryContents('/videos').catch(()=>[]) as unknown;
+      const entries = raw as WebDavEntry[];
       out.webdav = entries.filter(e=> e.type==='file' && e.basename.endsWith('.json')).map(e=> e.basename);
-    } catch (e:any) { out.webdav = { error: e.message }; }
+    } catch (e: unknown) {
+      out.webdav = { error: e instanceof Error ? e.message : 'unknown error' };
+    }
   } else {
     out.webdav = 'disabled';
   }

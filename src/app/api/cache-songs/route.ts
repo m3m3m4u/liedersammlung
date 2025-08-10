@@ -1,6 +1,8 @@
 import { NextRequest } from 'next/server';
 import { getSongsCollection } from '@/lib/mongo';
-import { isWebdavEnabled, getWebdavClient, IMAGE_EXTENSIONS } from '@/lib/webdav';
+import { isWebdavEnabled, getWebdavClient } from '@/lib/webdav';
+
+interface WebDavEntry { type: string; basename: string; [k: string]: unknown }
 
 // liefert schnelle Liste der Songtitel aus der DB, optional initialer Scan wenn leer
 export async function GET(req: NextRequest) {
@@ -11,7 +13,7 @@ export async function GET(req: NextRequest) {
     if (!col) {
       return new Response(JSON.stringify({ songs: [] }), { status: 200, headers: { 'content-type': 'application/json' } });
     }
-    const query: any = {};
+  const query: Record<string, unknown> = {};
     if (category) query.category = category;
 
     let docs = await col
@@ -21,16 +23,18 @@ export async function GET(req: NextRequest) {
 
     if (docs.length === 0 && isWebdavEnabled()) {
       // beide Kategorien scannen (oder nur angefragte, falls gesetzt)
-      const cats: ("noten"|"texte")[] = category ? [category] : ['noten','texte'];
+      const cats: ('noten'|'texte')[] = category ? [category] : ['noten','texte'];
       const client = getWebdavClient();
       const bulk = col.initializeUnorderedBulkOp();
+      let ops = 0;
       for (const cat of cats) {
         // versuche kleinschreibung und Großschreibung (historische Inkonsistenz)
         const candidateDirs = [`/${cat}`, `/${cat.charAt(0).toUpperCase()+cat.slice(1)}`];
-        let entries: any[] = [];
+        let entries: WebDavEntry[] = [];
         for (const basePath of candidateDirs) {
           try {
-            entries = (await client.getDirectoryContents(basePath, { deep: false })) as any[];
+            const raw = await client.getDirectoryContents(basePath, { deep: false });
+            entries = (raw as unknown as WebDavEntry[]);
             if (entries.length) break; // gefunden
           } catch {/* ignore */}
         }
@@ -47,9 +51,10 @@ export async function GET(req: NextRequest) {
             },
             $set: { updatedAt: new Date(), lastSync: new Date() },
           });
+          ops++;
         }
       }
-      if ((bulk as any).length > 0) await bulk.execute();
+      if (ops > 0) await bulk.execute();
       docs = await col
         .find(query, { projection: { folder: 1, title: 1, category: 1, imageCount: 1 } })
         .sort({ title: 1 })
@@ -60,8 +65,9 @@ export async function GET(req: NextRequest) {
       status: 200,
       headers: { 'content-type': 'application/json' },
     });
-  } catch (e: any) {
-    return new Response(JSON.stringify({ error: e.message }), { status: 500 });
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : 'unbekannter Fehler';
+    return new Response(JSON.stringify({ error: msg }), { status: 500 });
   }
 }
 
@@ -74,14 +80,15 @@ export async function POST(req: NextRequest) {
   const col = await getSongsCollection();
   if (!col) return new Response(JSON.stringify({ ok: false, reason: 'no collection' }), { status: 500 });
     const client = getWebdavClient();
-    const cats: ("noten"|"texte")[] = ['noten','texte'];
+    const cats: ('noten'|'texte')[] = ['noten','texte'];
     let totalFolders = 0, updated = 0;
     const bulk = col.initializeUnorderedBulkOp();
+    let ops = 0;
     for (const cat of cats) {
       const candidateDirs = [`/${cat}`, `/${cat.charAt(0).toUpperCase()+cat.slice(1)}`];
-      let entries: any[] = [];
+      let entries: WebDavEntry[] = [];
       for (const basePath of candidateDirs) {
-        try { entries = (await client.getDirectoryContents(basePath, { deep: false })) as any[]; if (entries.length) break; } catch {/* ignore */}
+        try { const raw = await client.getDirectoryContents(basePath, { deep: false }); entries = raw as unknown as WebDavEntry[]; if (entries.length) break; } catch {/* ignore */}
       }
       const folders = entries.filter(e => e.type === 'directory');
       totalFolders += folders.length;
@@ -98,11 +105,13 @@ export async function POST(req: NextRequest) {
           $set: { updatedAt: new Date(), lastSync: new Date() },
         });
         updated++;
+        ops++;
       }
     }
-    if ((bulk as any).length > 0) await bulk.execute();
+    if (ops > 0) await bulk.execute();
     return new Response(JSON.stringify({ ok: true, totalFolders, upserts: updated }), { status: 200 });
-  } catch (e: any) {
-    return new Response(JSON.stringify({ error: e.message }), { status: 500 });
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : 'unbekannter Fehler';
+    return new Response(JSON.stringify({ error: msg }), { status: 500 });
   }
 }
