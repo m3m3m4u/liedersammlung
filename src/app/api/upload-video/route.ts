@@ -35,12 +35,13 @@ export async function POST(request: Request) {
         await collection.insertOne(doc);
         console.log(`[upload-video] In DB gespeichert: ${slug}`);
         return NextResponse.json({ message: `Video "${title}" erfolgreich (DB) hinzugefügt!`, slug });
-      } catch (e: any) {
-        if (e?.code === 11000) {
+      } catch (e) {
+        const err = e as { code?: number };
+        if (err?.code === 11000) {
           await collection.updateOne({ slug }, { $set: { title: title.trim(), url: url.trim() } });
           return NextResponse.json({ message: `Video "${title}" aktualisiert (DB).`, slug });
         }
-        console.error('DB Insert Fehler:', e);
+        console.error('DB Insert Fehler:', err);
       }
     }
 
