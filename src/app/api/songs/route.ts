@@ -76,31 +76,35 @@ export async function GET(request: Request) {
 
     if (isWebdavEnabled() && (type === 'noten' || type === 'texte')) {
       try {
-    const client = getWebdavClient();
-    const baseDir = `/${type}`;
-    const entries = await client.getDirectoryContents(baseDir).catch(() => []) as WebDavEntry[];
-    const folderEntries = entries.filter((e: WebDavEntry) => e.type === 'directory');
-    const songs = await Promise.all(folderEntries.map(async (folder: WebDavEntry) => {
+        const client = getWebdavClient();
+        // Versuche Klein- und Großschreibung ("/noten" und "/Noten")
+        const candidateDirs = [`/${type}`, `/${type.charAt(0).toUpperCase()}${type.slice(1)}`];
+        let entries: WebDavEntry[] = [];
+        let baseDirUsed = candidateDirs[0];
+        for (const dir of candidateDirs) {
           try {
-            const folderPath = `${baseDir}/${folder.basename}`;
-      const files = await client.getDirectoryContents(folderPath).catch(() => []) as WebDavEntry[];
+            const r = await client.getDirectoryContents(dir).catch(() => []) as WebDavEntry[];
+            if (r.length) { entries = r; baseDirUsed = dir; break; }
+            // falls leer, trotzdem merken falls keine Alternative existiert
+            if (!entries.length) { entries = r; baseDirUsed = dir; }
+          } catch { /* ignore and try next */ }
+        }
+        const folderEntries = entries.filter(e => e.type === 'directory');
+        const songs = await Promise.all(folderEntries.map(async (folder) => {
+          try {
+            const folderPath = `${baseDirUsed}/${folder.basename}`;
+            const files = await client.getDirectoryContents(folderPath).catch(() => []) as WebDavEntry[];
             const imageFiles = files
               .filter(f => f.type === 'file' && IMAGE_EXTENSIONS.includes(path.extname(f.basename).toLowerCase()))
               .sort((a, b) => a.basename.localeCompare(b.basename));
             const publicBase = buildPublicUrl('');
             const images = imageFiles.map(f => {
-              const relative = `${type}/${folder.basename}/${f.basename}`;
+              const relative = `${type}/${folder.basename}/${f.basename}`; // relative Pfad weiter gemischt, Proxy akzeptiert
               const publicUrl = publicBase ? buildPublicUrl(relative)! : `/api/webdav-file?path=${encodeURIComponent(relative)}`;
               return publicUrl;
             });
-            return {
-              _id: folder.basename.toLowerCase().replace(/\s+/g, '-'),
-              title: folder.basename,
-              images,
-            };
-          } catch {
-            return null;
-          }
+            return { _id: folder.basename.toLowerCase().replace(/\s+/g, '-'), title: folder.basename, images };
+          } catch { return null; }
         }));
         return NextResponse.json(songs.filter(Boolean));
       } catch (e) {
