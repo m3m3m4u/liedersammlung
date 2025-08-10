@@ -90,7 +90,7 @@ export async function GET(request: Request) {
       };
       if (songsCol) {
         try {
-          let docs = await songsCol.find({ category: type }).sort({ title: 1 }).toArray();
+          const docs = await songsCol.find({ category: type }).sort({ title: 1 }).toArray();
           if (docs.length && docs.some(d => (d.images||[]).length === 0) && isWebdavEnabled()) {
             // Populate fehlender Bilder
             const client = getWebdavClient();
