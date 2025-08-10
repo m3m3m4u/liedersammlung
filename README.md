@@ -97,20 +97,22 @@ Standard-Passwort: `noten123` (kann in `src/components/Login.tsx` geändert werd
 
 ### GET /api/songs
 
-Gibt alle verfügbaren Songs zurück, abhängig vom Content-Type.
+Listet Songs (oder Videos mit `type=videos`). Nutzt MongoDB falls vorhanden, fällt sonst auf WebDAV oder lokale Dateien zurück.
 
 **Parameter:**
-- `type` (optional): `'noten'` oder `'texte'` (Standard: `'texte'`)
+- `type` (optional): `'noten'`, `'texte'` oder `videos` (Standard: `'texte'`)
 
-**Response:**
-```json
-[
-  {
-    "_id": "song-name",
-    "title": "Song Name",
-    "images": ["/images/texte/Song Name/1.jpg", "..."]
-  }
-]
+### GET /api/cache-songs
+
+Schneller Abruf gecachter Songtitel (nur Metadaten: Ordner, Titel). Wenn die Songs-Collection leer ist und WebDAV aktiv ist, werden Verzeichnisnamen einmalig eingelesen und in MongoDB upserted.
+
+### POST /api/cache-songs
+
+Erzwingt einen Refresh Scan aller Song-Verzeichnisse (`noten` und `texte`). Nützlich für einen "Warmup" beim Deployment.
+
+**Beispiel Warmup Skript (PowerShell):**
+```powershell
+Invoke-WebRequest -UseBasicParsing http://localhost:3000/api/cache-songs | Out-Null
 ```
 
 ## Entwicklung

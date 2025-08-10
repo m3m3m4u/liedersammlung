@@ -87,7 +87,7 @@ export default function SongList() {
       </div>
       <div className="flex-grow-1 d-flex justify-content-center px-4" style={{ paddingBottom: 20 }}>
         <div className="text-center" style={{ maxWidth: 1470 }}>
-          {avail.length === 0 ? <div className="text-white">Keine Inhalte</div> : <div className="d-flex flex-wrap justify-content-center">{(['1',...LETTERS]).map(b => { const ok = avail.includes(b); return <button key={b} className="btn btn-lg text-white" style={{ background: ok?'#6a6a6a':'#2a2a2a', border:'2px solid #8a8a8a', width:120, height:100, borderRadius:14, margin:5, opacity: ok?1:.3 }} disabled={!ok} onClick={()=> ok && setSelectedLetter(b)}>{b}</button>; })}</div>}
+          {avail.length === 0 ? <div className="text-white">Keine Inhalte</div> : <div className="d-flex flex-wrap justify-content-center">{(['1',...LETTERS]).map(b => { const ok = avail.includes(b); return <button key={b} className="btn btn-lg text-white" style={{ background: ok?'#6a6a6a':'#2a2a2a', border:'2px solid #8a8a8a', width:216, height:180, borderRadius:18, margin:6, opacity: ok?1:.3, fontSize:'2.5rem', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:600 }} disabled={!ok} onClick={()=> ok && setSelectedLetter(b)}>{b}</button>; })}</div>}
         </div>
       </div>
       <div className="flex-shrink-0 d-flex justify-content-center align-items-center px-4" style={{ paddingBottom:30, position:'relative' }}>

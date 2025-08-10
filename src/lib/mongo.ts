@@ -46,6 +46,8 @@ export interface SongDoc {
   images: string[]; // Dateinamen (nur Dateinamen, ohne Pfad)
   createdAt: Date;
   updatedAt: Date;
+  imageCount?: number;
+  lastSync?: Date;
 }
 
 export function makeSlug(title: string): string {
