@@ -51,46 +51,12 @@ export default function SongDetail({ song, onBack, onHome }: SongDetailProps) {
     return () => window.removeEventListener('resize', calculateAvailableHeight);
   }, []);
 
-  // Zustand: erste Seite vollständig gerendert
-  const [firstPageLoaded, setFirstPageLoaded] = useState(false);
-
   // Erstes Bild gilt als vorgeladen (Index 0)
   useEffect(() => {
     if (images.length) {
       setPreloadedImages(new Set([0]));
     }
   }, [images]);
-
-  // Preload aller restlichen Bilder NACHDEM Seite 1 angezeigt wurde
-  useEffect(() => {
-    if (!firstPageLoaded) return; // Warten bis erstes Bild fertig
-    if (images.length <= 1) return;
-    console.log('⚡ Starte Preloading aller weiteren Seiten nach Anzeige der ersten. Anzahl:', images.length - 1);
-
-    let cancelled = false;
-    const loaders: HTMLImageElement[] = [];
-
-    for (let i = 1; i < images.length; i++) {
-      const src = images[i];
-      const img = new window.Image();
-      loaders.push(img);
-      img.onload = () => {
-        if (!cancelled) {
-          setPreloadedImages(prev => {
-            const n = new Set(prev);
-            n.add(i);
-            return n;
-          });
-        }
-      };
-      img.onerror = () => !cancelled && console.log('❌ Fehler beim Laden Seite', i + 1);
-      img.src = src;
-    }
-
-    return () => {
-      cancelled = true;
-    };
-  }, [firstPageLoaded, images]);
 
   const nextImage = useCallback(() => {
     setCurrentImageIndex((prev) => (prev + 1) % images.length);
@@ -459,9 +425,12 @@ export default function SongDetail({ song, onBack, onHome }: SongDetailProps) {
             placeholder="blur"
             blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAAIAAoDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAhEAACAQMDBQAAAAAAAAAAAAABAgMABAUGIWGRkqGx0f/EABUBAQEAAAAAAAAAAAAAAAAAAAMF/8QAGhEAAgIDAAAAAAAAAAAAAAAAAAECEgMRkf/aAAwDAQACEQMRAD8AltJagyeH0AthI5xdrLcNM91BF5pX2HaH9bcfaSXWGaRmknyLli5i3Aw6p3XS59OOuuxJaajjzRwgSXq4q71/wE0fDXXOe2IiKAAAAAA//2Q=="
             onLoadingComplete={() => {
-              if (currentImageIndex === 0 && !firstPageLoaded) {
-                setFirstPageLoaded(true);
-              }
+              setPreloadedImages(prev => {
+                if (prev.has(currentImageIndex)) return prev;
+                const n = new Set(prev);
+                n.add(currentImageIndex);
+                return n;
+              });
             }}
           />
           

@@ -8,7 +8,8 @@ export async function POST(request: Request) {
   try {
     const formData = await request.formData();
     const title = formData.get('title') as string;
-    const url = formData.get('url') as string;
+  const rawUrl = formData.get('url') as string;
+  const url = (rawUrl || '').trim();
 
     if (!title || !url) {
       return NextResponse.json(
@@ -17,20 +18,19 @@ export async function POST(request: Request) {
       );
     }
 
-    // Validiere YouTube-URL
-    const youtubeRegex = /^(https?:\/\/)?(www\.)?(youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)[a-zA-Z0-9_-]{11}/;
-    if (!youtubeRegex.test(url)) {
-      return NextResponse.json(
-        { message: 'Ungültige YouTube-URL' },
-        { status: 400 }
-      );
+    // Validiere & extrahiere YouTube Video-ID (robuster, erlaubt zusätzliche Parameter)
+    // Quelle ähnliches Muster wie in VideoDetail.tsx
+    const idMatch = url.match(/^.*(?:youtu\.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]{11}).*/);
+    const videoId = idMatch?.[1];
+    if (!videoId || videoId.length !== 11 || /[^a-zA-Z0-9_-]/.test(videoId)) {
+      return NextResponse.json({ message: 'Ungültige YouTube-URL oder Video-ID nicht gefunden' }, { status: 400 });
     }
 
     // Versuche MongoDB zuerst
     const collection = await getVideoCollection();
     if (collection) {
       const slug = makeSlug(title);
-      const doc = { slug, title: title.trim(), url: url.trim(), createdAt: new Date() };
+  const doc = { slug, title: title.trim(), url, videoId, createdAt: new Date() };
       try {
         await collection.insertOne(doc);
         console.log(`[upload-video] In DB gespeichert: ${slug}`);
@@ -38,7 +38,7 @@ export async function POST(request: Request) {
       } catch (e) {
         const err = e as { code?: number };
         if (err?.code === 11000) {
-          await collection.updateOne({ slug }, { $set: { title: title.trim(), url: url.trim() } });
+          await collection.updateOne({ slug }, { $set: { title: title.trim(), url, videoId } });
           return NextResponse.json({ message: `Video "${title}" aktualisiert (DB).`, slug });
         }
         console.error('DB Insert Fehler:', err);
@@ -53,7 +53,7 @@ export async function POST(request: Request) {
     const safeTitle = title.replace(/[<>:"/\\|?*]/g, '').replace(/\s+/g, ' ').trim();
     const fileName = `${safeTitle}.json`;
     const filePath = path.join(videosDir, fileName);
-    const videoData = { title: title, url: url, created: new Date().toISOString() };
+  const videoData = { title: title.trim(), url, videoId, created: new Date().toISOString() };
     if (isWebdavEnabled()) {
       const client = getWebdavClient();
       const remoteDir = '/videos';

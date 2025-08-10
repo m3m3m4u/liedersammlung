@@ -6,13 +6,29 @@ declare global {
 
 const uri = process.env.MONGODB_URI;
 if (!uri) {
-  console.warn('[mongo] MONGODB_URI nicht gesetzt – Video-Funktionen fallen auf Dateisystem/WebDAV zurück.');
+  console.warn('[mongo] MONGODB_URI nicht gesetzt – DB-Funktionen deaktiviert.');
+}
+
+const VALID_PREFIXES = ['mongodb://', 'mongodb+srv://'];
+
+export function validateMongoUri(): string | undefined {
+  if (!uri) return 'MONGODB_URI fehlt';
+  if (!VALID_PREFIXES.some(p => uri.startsWith(p))) {
+    const shown = uri.split('@')[0]; // nur vorderer Teil vor evtl. Credentials-Trenner – kein Passwort-Leak
+    return `Ungültiges Format (beginnt mit "${shown}"), erwartet mongodb:// oder mongodb+srv://`;
+  }
+  return undefined;
 }
 
 let clientPromise: Promise<MongoClient> | undefined;
 
 export function getMongoClientPromise(): Promise<MongoClient> | undefined {
   if (!uri) return undefined;
+  const invalid = validateMongoUri();
+  if (invalid) {
+    console.error('[mongo] ' + invalid);
+    return undefined;
+  }
   if (global._mongoClientPromise) return global._mongoClientPromise;
   if (!clientPromise) {
     const client = new MongoClient(uri, { serverSelectionTimeoutMS: 5000 });

@@ -1,18 +1,39 @@
 # Noten-Verwaltung
 
-Eine moderne Next.js-Anwendung zur Verwaltung von Musiknoten und Liedtexten.
+Eine moderne Next.js-Anwendung zur Verwaltung von Musiknoten, Liedtexten und Videos mit MongoDB & Hetzner WebDAV.
 
-## Features
+## Kern-Features (Aktueller Stand)
 
-- 📄 **Dual Content System**: Unterstützt sowohl Noten (`/public/images/noten/`) als auch Texte (`/public/images/texte/`)
-- 🔐 **Password Protection**: Einfache localStorage-basierte Authentifizierung
-- 🎨 **Responsive Design**: Optimiert für Desktop und mobile Geräte
-- ⌨️ **Keyboard Navigation**: Vollständige Tastatursteuerung für schnelle Navigation
-- 🖼️ **Image Optimization**: Automatische Bildgrößenanpassung mit Next.js Image-Komponente
-- 🔍 **A-Z Navigation**: Alphabetische Sortierung und Filterung
-- 📱 **Fullscreen Mode**: Vollbildmodus für optimale Anzeige
+- � **Remote Storage (Hetzner WebDAV)**: Bilder (Noten & Texte) liegen vollständig extern, keine lokalen Kopien nötig.
+- 🗄️ **MongoDB**: Metadaten (Songs, Videos) + gecachte Bild-Dateiliste pro Song.
+- � **Schneller Start**: Startseite lädt nur einen minimalen Index (Titel/Folders) via `?minimal=1` ohne Images.
+- 🖼️ **Lazy Loading**: Bilder eines Songs werden erst beim Öffnen des Songs nachgeladen (`/api/song`).
+- � **Video-Unterstützung**: YouTube-Links mit robuster ID-Erkennung (inkl. youtu.be Shortlinks).
+- 🔐 **Lightweight Auth**: Einfache localStorage-Abfrage (optional später austauschbar).
+- ⌨️ **Keyboard / Touch Navigation**: Blättern per Pfeiltaste, Zahlentasten, Swipe auf Touch.
+- 📊 **Debug Endpoints**: `/api/debug/status` & `/api/debug/songs` helfen bei Deploy-/Connectivity-Problemen.
+- ♻️ **Automatische Bild-Synchronisation**: Fehlen Bilder in der DB, werden sie bei Bedarf aus WebDAV nachgetragen.
 
-## Installation
+## Architektur Überblick
+
+```
+Client UI (SongList, SongDetail, VideoDetail)
+	│
+	├── GET /api/songs?type=noten&minimal=1  → Minimaler Index (Titel/Folders)
+	├── GET /api/song?folder=Folder&type=noten → Bilder eines Songs (lazy)
+	├── GET /api/songs?type=videos            → Videos (Mongo / WebDAV JSON Fallback)
+	├── POST /api/upload-song (optional / falls vorhanden)
+	├── POST /api/upload-video
+	└── Debug: /api/debug/status, /api/debug/songs
+
+MongoDB (Collection songs / videos)
+	▲         │
+	│ Cache & Metadaten (images[], imageCount)
+	│
+WebDAV (Hetzner)  ← Primäre Quelle für Bilddateien
+```
+
+## Installation (Lokal)
 
 1. Repository klonen:
 ```bash
@@ -32,7 +53,7 @@ npm run dev
 
 4. Öffne [http://localhost:3000](http://localhost:3000) im Browser
 
-## Projektstruktur
+## Projektstruktur (vereinfacht)
 
 ```
 noten-verwaltung/
@@ -67,10 +88,7 @@ Die Anwendung unterstützt zwei Content-Types:
 
 Jeder Song sollte einen eigenen Ordner haben:
 ```
-public/images/noten/Song Name/
-├── 1.jpg
-├── 2.jpg
-└── 3.jpg
+Remote über WebDAV (z.B. `/noten/Song Name/1.jpg`). Lokales `public/` wird für Bilder nicht mehr benötigt (nur Fallback / Assets).
 ```
 
 ### Tastatursteuerung
@@ -93,27 +111,65 @@ Standard-Passwort: `noten123` (kann in `src/components/Login.tsx` geändert werd
 - **Bildverarbeitung**: Next.js Image-Komponente
 - **State Management**: React Hooks (useState, useEffect)
 
-## API
+## API Endpoints (aktuell)
 
-### GET /api/songs
+| Endpoint | Beschreibung | Parameter | Bemerkung |
+|----------|--------------|-----------|-----------|
+| `GET /api/songs?type=noten&minimal=1` | Minimaler Index (ohne Images) | `type` (`noten|texte|videos`), `minimal=1` | Schnell für UI Start |
+| `GET /api/song?folder=FOLDER&type=noten` | Vollständiger Song (mit Bild-URLs) | `folder`, `type` | Lazy Loading |
+| `GET /api/songs?type=videos` | Videos | `type=videos` | Liest Mongo, sonst WebDAV JSON |
+| `POST /api/upload-video` | Video hinzufügen | Body (JSON) | Speichert in Mongo |
+| `GET /api/debug/status` | Health Check | – | webdavOk / dbOk |
+| `GET /api/debug/songs` | Stichprobe + Verzeichnisliste | `type` optional | Diagnose |
+| `GET /api/webdav-file?path=noten/...` | Proxy für Bild | `path` | Nutzt wenn kein `STORAGEBOX_PUBLIC_BASE_URL` gesetzt |
 
-Listet Songs (oder Videos mit `type=videos`). Nutzt MongoDB falls vorhanden, fällt sonst auf WebDAV oder lokale Dateien zurück.
+Historische Endpoints wie `/api/cache-songs` sind entfernt / obsolet.
 
-**Parameter:**
-- `type` (optional): `'noten'`, `'texte'` oder `videos` (Standard: `'texte'`)
+## Umgebungsvariablen (Vercel)
 
-### GET /api/cache-songs
+Folgende Variablen im Vercel Dashboard setzen (Project → Settings → Environment Variables):
 
-Schneller Abruf gecachter Songtitel (nur Metadaten: Ordner, Titel). Wenn die Songs-Collection leer ist und WebDAV aktiv ist, werden Verzeichnisnamen einmalig eingelesen und in MongoDB upserted.
+- `MONGODB_URI` (z.B. Atlas Connection String)
+- `MONGODB_DB` (z.B. `liedersammlung`)
+- `STORAGEBOX_WEBDAV_URL` (z.B. `https://<user>.your-storagebox.de`)
+- `STORAGEBOX_USER`
+- `STORAGEBOX_PASS`
+- `STORAGEBOX_PUBLIC_BASE_URL` (optional – wenn gesetzt, direkte Auslieferung; sonst Proxy)
+- `MIGRATION_TOKEN` (falls Migration-Route verwendet wird)
 
-### POST /api/cache-songs
+Hinweis: `.env.local` ist durch `.gitignore` geschützt und sollte nicht committed werden. Falls Credentials bereits im Git-Verlauf auftauchten → Schlüssel/Passwort rotieren.
 
-Erzwingt einen Refresh Scan aller Song-Verzeichnisse (`noten` und `texte`). Nützlich für einen "Warmup" beim Deployment.
+## Deployment auf Vercel – Checkliste
 
-**Beispiel Warmup Skript (PowerShell):**
-```powershell
-Invoke-WebRequest -UseBasicParsing http://localhost:3000/api/cache-songs | Out-Null
-```
+1. Repository auf GitHub verbinden.
+2. Environment Variables (siehe oben) in allen relevanten Environments (Production / Preview) hinterlegen.
+3. (Optional) `STORAGEBOX_PUBLIC_BASE_URL` erst setzen, wenn CORS & Direct Access gewünscht.
+4. Erster Aufruf produziert ggf. einen WebDAV-Scan wenn DB leer → kann je nach Anzahl Ordner dauern. Empfehlung: einmal lokal Migration/Scan ausführen und DB bereitstellen, dann deployen.
+5. Debug nach Deployment:
+	- `https://<vercel-domain>/api/debug/status`
+	- `https://<vercel-domain>/api/songs?type=noten&minimal=1`
+	- Song öffnen → prüfe Lazy Load.
+6. Bilder-Ladepfad prüfen (DevTools Network: sollten 200 vom Proxy oder direkt vom Storage liefern, mit Cache-Control Header).
+
+## Performance Hinweise
+
+- Minimaler Index reduziert Payload massiv (nur Titel & Folder statt aller Bild-URLs).
+- `/api/song` holt nur nötige Bilder; Preloading in der UI beschränkt auf Nachbarseiten.
+- Möglichkeit für zukünftige Optimierung: Response Caching auf Vercel (z.B. mittels `Cache-Control` / Edge Funktionen) oder Redis Layer (nicht implementiert).
+ - HTTP-Caching jetzt aktiv: `Cache-Control` + schwache `ETag`s auf `/api/songs` (30–120s) und `/api/song` (120s) + `stale-while-revalidate` für schnelle Wiederholungsaufrufe.
+
+## Sicherheit / Datenschutz
+
+- Aktuelle Auth ist rein clientseitig (nur UI-Schutz). Für echte Absicherung: Auth-Layer (JWT / NextAuth / Basic Auth) ergänzen.
+- WebDAV Zugangsdaten ausschließlich in Server-Runtime (ENV) – niemals clientseitig ausgeben.
+
+## Weiterentwicklung – Ideen
+
+- Serverseitiges Vorwärmen (Warmup Function) → Cron Ping.
+- Upload UI mit Drag & Drop + sofortigem WebDAV Push + DB Sync.
+- Suchindex / Volltext (Titel / Tags).
+- Rollenbasierte Auth & echte Session.
+- Vorschaubilder (Thumbnails) generieren um Initial Load weiter zu verkleinern.
 
 ## Entwicklung
 
@@ -123,7 +179,7 @@ Invoke-WebRequest -UseBasicParsing http://localhost:3000/api/cache-songs | Out-N
 2. API-Routen in `src/app/api/` hinzufügen
 3. Styling direkt in den Komponenten
 
-### Build für Production
+## Build lokal (Production Test)
 
 ```bash
 npm run build

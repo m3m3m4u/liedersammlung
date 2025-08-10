@@ -15,7 +15,8 @@ interface WebDavEntry {
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
-    const type = searchParams.get('type') || 'texte'; // Default: texte
+  const type = searchParams.get('type') || 'texte'; // Default: texte
+  const minimal = searchParams.get('minimal') === '1'; // nur Metadaten (ohne images)
     
   // Für Videos verwenden wir ein anderes Verzeichnis und JSON-Dateien
   if (type === 'videos') {
@@ -67,145 +68,104 @@ export async function GET(request: Request) {
     } catch { return NextResponse.json([]); }
   }
     
-    if (type === 'noten' || type === 'texte') {
-      // Erst DB versuchen
+  if (type === 'noten' || type === 'texte') {
       const songsCol = await getSongsCollection();
-      if (songsCol) {
-        try {
-          const docs = await songsCol.find({ category: type as 'noten' | 'texte' }).sort({ title: 1 }).toArray();
-          if (docs.length) {
-            // URLs konstruieren: Bei WebDAV über public URL oder Proxy, bei lokal /images Pfad
-            const publicBase = buildPublicUrl('');
-            const result = docs.map(d => {
-              let images: string[];
-              if (isWebdavEnabled()) {
-                images = d.images.map(img => {
+      // Helper zum Konstruieren finaler JSON Antwort
+      const buildResponse = (docs: any[]) => {
+        const publicBase = buildPublicUrl('');
+        return docs.map(d => {
+          const imgs = (d.images || []) as string[];
+          let images: string[] | undefined;
+          if (!minimal) {
+            images = isWebdavEnabled()
+              ? imgs.map(img => {
                   const relative = `${type}/${d.folder}/${img}`;
                   return publicBase ? buildPublicUrl(relative)! : `/api/webdav-file?path=${encodeURIComponent(relative)}`;
-                });
-              } else {
-                images = d.images.map(img => `/images/${type}/${d.folder}/${img}`);
-              }
-              return { _id: d.folder.toLowerCase().replace(/\s+/g,'-'), title: d.title, images };
-            });
-            return NextResponse.json(result);
+                })
+              : imgs.map(img => `/images/${type}/${d.folder}/${img}`);
           }
-        } catch (e) {
-          console.error('Song DB Query Fehler:', e);
-        }
-      }
-    }
-
-    if (isWebdavEnabled() && (type === 'noten' || type === 'texte')) {
-      try {
-        const client = getWebdavClient();
-        // Versuche Klein- und Großschreibung ("/noten" und "/Noten")
-        const candidateDirs = [`/${type}`, `/${type.charAt(0).toUpperCase()}${type.slice(1)}`];
-        let entries: WebDavEntry[] = [];
-        let baseDirUsed = candidateDirs[0];
-        for (const dir of candidateDirs) {
-          try {
-            const r = await client.getDirectoryContents(dir).catch(() => []) as WebDavEntry[];
-            if (r.length) { entries = r; baseDirUsed = dir; break; }
-            // falls leer, trotzdem merken falls keine Alternative existiert
-            if (!entries.length) { entries = r; baseDirUsed = dir; }
-          } catch { /* ignore and try next */ }
-        }
-        const folderEntries = entries.filter(e => e.type === 'directory');
-        const songs = await Promise.all(folderEntries.map(async (folder) => {
-          try {
-            const folderPath = `${baseDirUsed}/${folder.basename}`;
-            const files = await client.getDirectoryContents(folderPath).catch(() => []) as WebDavEntry[];
-            const imageFiles = files
-              .filter(f => f.type === 'file' && IMAGE_EXTENSIONS.includes(path.extname(f.basename).toLowerCase()))
-              .sort((a, b) => a.basename.localeCompare(b.basename));
-            const publicBase = buildPublicUrl('');
-            const images = imageFiles.map(f => {
-              const relative = `${type}/${folder.basename}/${f.basename}`; // relative Pfad weiter gemischt, Proxy akzeptiert
-              const publicUrl = publicBase ? buildPublicUrl(relative)! : `/api/webdav-file?path=${encodeURIComponent(relative)}`;
-              return publicUrl;
-            });
-            return { _id: folder.basename.toLowerCase().replace(/\s+/g, '-'), title: folder.basename, images };
-          } catch { return null; }
-        }));
-        return NextResponse.json(songs.filter(Boolean));
-      } catch (e) {
-        console.error('WebDAV Listing Fehler', e);
-        return NextResponse.json([], { status: 200 });
-      }
-    }
-
-  // Fallback lokal (nur wenn nicht WebDAV oder DB leer)
-    const baseDir = path.join(process.cwd(), 'public', 'images', type);
-    
-    console.log('Current working directory:', process.cwd());
-    console.log('Looking for directory:', baseDir);
-    
-    // Prüfen ob das Verzeichnis existiert
-    try {
-      await access(baseDir, constants.F_OK);
-      console.log('Directory exists:', baseDir);
-    } catch (accessError) {
-      console.error('Directory does not exist:', baseDir);
-      console.error('Access error:', accessError);
-      
-      // Alternative Pfade versuchen
-      const altPath1 = path.join(__dirname, '..', '..', '..', '..', 'public', 'images', type);
-      const altPath2 = path.join(process.cwd(), '..', 'public', 'images', type);
-      
-      console.log('Trying alternative path 1:', altPath1);
-      console.log('Trying alternative path 2:', altPath2);
-      
-      return NextResponse.json(
-        { 
-          error: `Directory not found: ${baseDir}`,
-          debug: {
-            cwd: process.cwd(),
-            baseDir,
-            type,
-            altPath1,
-            altPath2
-          }
-        },
-        { status: 404 }
-      );
-    }
-    
-    // Alle Unterordner im entsprechenden Verzeichnis lesen
-    const folders = await readdir(baseDir, { withFileTypes: true });
-    const songFolders = folders.filter(dirent => dirent.isDirectory());
-    
-    console.log(`Found ${songFolders.length} song folders in ${type}`);
-    
-    const songs = await Promise.all(
-      songFolders.map(async (folder) => {
-        const songDir = path.join(baseDir, folder.name);
-        
+          return { _id: d.folder.toLowerCase().replace(/\s+/g,'-'), title: d.title, images, folder: d.folder };
+        });
+      };
+      if (songsCol) {
         try {
-          // Alle Bilder im Song-Ordner lesen
-          const files = await readdir(songDir);
-          const imageFiles = files
-            .filter(file => /\.(jpg|jpeg|png|gif|webp)$/i.test(file))
-            .sort() // Alphabetische Sortierung für konsistente Reihenfolge
-            .map(file => `/images/${type}/${folder.name}/${file}`);
-          
-          return {
-            _id: folder.name.toLowerCase().replace(/\s+/g, '-'), // ID für React key
-            title: folder.name,
-            images: imageFiles
-          };
-        } catch (error) {
-          console.error(`Error reading folder ${folder.name}:`, error);
-          return null;
+          let docs = await songsCol.find({ category: type }).sort({ title: 1 }).toArray();
+          if (docs.length && docs.some(d => (d.images||[]).length === 0) && isWebdavEnabled()) {
+            // Populate fehlender Bilder
+            const client = getWebdavClient();
+            const bulk = songsCol.initializeUnorderedBulkOp();
+            let ops=0;
+            for (const d of docs) {
+              if (!d.images || d.images.length === 0) {
+                const bases = [`/${type}`, `/${type.charAt(0).toUpperCase()}${type.slice(1)}`];
+                let folderFiles: WebDavEntry[] = [];
+                for (const b of bases) {
+                  try { const raw = await client.getDirectoryContents(`${b}/${d.folder}`).catch(()=>[]) as WebDavEntry[]; if (raw.length) { folderFiles = raw; break; } } catch {}
+                }
+                if (folderFiles.length) {
+                  const imgs = folderFiles.filter(f=> f.type==='file' && IMAGE_EXTENSIONS.includes(path.extname(f.basename).toLowerCase())).sort((a,b)=>a.basename.localeCompare(b.basename)).map(f=>f.basename);
+                  if (imgs.length) { bulk.find({ _id: d._id }).updateOne({ $set: { images: imgs, imageCount: imgs.length, updatedAt: new Date() } }); d.images = imgs; ops++; }
+                }
+              }
+            }
+            if (ops) { try { await bulk.execute(); } catch (e) { console.warn('populate bulk error', e); } }
+          }
+          if (docs.length) {
+            const payload = buildResponse(docs);
+            // ETag basierend auf Anzahl + neuestem updatedAt
+            const newest = Math.max(...docs.map(d => new Date(d.updatedAt || d.createdAt || Date.now()).getTime()));
+            const etag = `W/"s-${type}-${docs.length}-${newest}"`;
+            if (request.headers.get('if-none-match') === etag) {
+              const notMod = new NextResponse(null, { status: 304 });
+              notMod.headers.set('ETag', etag);
+              notMod.headers.set('Cache-Control', minimal ? 'public, max-age=30, stale-while-revalidate=300' : 'public, max-age=120, stale-while-revalidate=600');
+              return notMod;
+            }
+            const res = NextResponse.json(payload);
+            res.headers.set('Cache-Control', minimal ? 'public, max-age=30, stale-while-revalidate=300' : 'public, max-age=120, stale-while-revalidate=600');
+            res.headers.set('ETag', etag);
+            return res;
+          }
+        } catch (e) { console.error('Song DB Query Fehler:', e); }
+      }
+      // DB leer → WebDAV Direkt-Scan + Insert
+      if (isWebdavEnabled()) {
+        try {
+          const client = getWebdavClient();
+          const bases = [`/${type}`, `/${type.charAt(0).toUpperCase()}${type.slice(1)}`];
+          let baseUsed = bases[0]; let entries: WebDavEntry[] = [];
+          for (const b of bases) { try { const r = await client.getDirectoryContents(b).catch(()=>[]) as WebDavEntry[]; if (r.length) { entries=r; baseUsed=b; break; } } catch{} }
+          const dirs = entries.filter(e=> e.type==='directory');
+          const docs: any[] = [];
+          for (const dir of dirs) {
+            const folderPath = `${baseUsed}/${dir.basename}`;
+            const files = await client.getDirectoryContents(folderPath).catch(()=>[]) as WebDavEntry[];
+            const imgs = files.filter(f=> f.type==='file' && IMAGE_EXTENSIONS.includes(path.extname(f.basename).toLowerCase())).sort((a,b)=>a.basename.localeCompare(b.basename)).map(f=>f.basename);
+            docs.push({ category: type, folder: dir.basename, title: dir.basename, images: imgs, createdAt: new Date(), updatedAt: new Date(), imageCount: imgs.length });
+          }
+          if (songsCol && docs.length) {
+            try { await songsCol.insertMany(docs, { ordered: false }); } catch {/* dupe safe */}
+          }
+          const payload = buildResponse(docs);
+          const newest = Math.max(...docs.map(d => new Date(d.updatedAt || d.createdAt || Date.now()).getTime()), 0);
+          const etag = `W/"w-${type}-${docs.length}-${newest}"`;
+          if (request.headers.get('if-none-match') === etag) {
+            const notMod = new NextResponse(null, { status: 304 });
+            notMod.headers.set('ETag', etag);
+            notMod.headers.set('Cache-Control', minimal ? 'public, max-age=30, stale-while-revalidate=300' : 'public, max-age=120, stale-while-revalidate=600');
+            return notMod;
+          }
+          const res = NextResponse.json(payload);
+          res.headers.set('Cache-Control', minimal ? 'public, max-age=30, stale-while-revalidate=300' : 'public, max-age=120, stale-while-revalidate=600');
+          res.headers.set('ETag', etag);
+          return res;
+        } catch (e) {
+          console.error('WebDAV Scan Fehler', e);
+          return NextResponse.json([]);
         }
-      })
-    );
-    
-    // Null-Werte herausfiltern (falls ein Ordner nicht lesbar war)
-    const validSongs = songs.filter(song => song !== null);
-    
-    console.log(`Returning ${validSongs.length} valid songs`);
-    return NextResponse.json(validSongs);
+      }
+      return NextResponse.json([]);
+    }
   } catch (error) {
     const { searchParams } = new URL(request.url);
     console.error(`Error reading ${searchParams?.get('type') || 'texte'} directory:`, error);

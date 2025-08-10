@@ -6,7 +6,7 @@ import SongDetail from './SongDetail';
 import VideoDetail from './VideoDetail';
 import Login from './Login';
 
-interface CleanSong { _id: string; title: string; images?: string[]; videoUrl?: string; }
+interface CleanSong { _id: string; title: string; images?: string[]; videoUrl?: string; folder?: string; }
 const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
 
 export default function SongList() {
@@ -17,51 +17,29 @@ export default function SongList() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [contentType, setContentType] = useState<'noten' | 'texte' | 'videos'>('texte');
+  const [contentType, setContentType] = useState<'noten' | 'texte' | 'videos'>('noten');
   const [keyboardEnabled, setKeyboardEnabled] = useState(false);
   // Buttons-Array konnte reduziert werden (Direkt generiert beim Rendern) – keine separate Konstante nötig
 
   useEffect(() => { setIsAuthenticated(localStorage.getItem('notenverwaltung_authenticated') === 'true'); }, []);
   useEffect(() => { if (!isAuthenticated) { setKeyboardEnabled(false); return; } const t = setTimeout(() => setKeyboardEnabled(true), 300); return () => clearTimeout(t); }, [isAuthenticated]);
 
-  const fetchSongsFull = useCallback(async () => {
-    try {
-      const res = await fetch(`/api/songs?type=${contentType}`);
-      if (!res.ok) throw new Error('Fetch fehlgeschlagen (full)');
-      const full = await res.json();
-      setSongs(full);
-    } catch (e) {
-      console.warn('Full Song Fetch Fehler', e);
-    }
-  }, [contentType]);
-
-  const fetchSongsFast = useCallback(async () => {
-    if (contentType === 'videos') {
-      // Für Videos direkt Full (kleine Menge)
-      await fetchSongsFull();
-      setLoading(false); return;
-    }
+  const fetchSongs = useCallback(async () => {
     try {
       setLoading(true);
-      // Schneller Metadaten-Call
-      const fastRes = await fetch(`/api/cache-songs?category=${contentType}`);
-      if (fastRes.ok) {
-        const data = await fastRes.json();
-        // map zu CleanSong ohne images
-        const minimal: CleanSong[] = (data.songs || []).map((s: any) => ({ _id: s.folder.toLowerCase().replace(/\s+/g,'-'), title: s.title }));
-        setSongs(minimal);
-      }
       setError(null);
+      const res = await fetch(`/api/songs?type=${contentType}&minimal=1`);
+      if (!res.ok) throw new Error('Fetch fehlgeschlagen');
+  const data: CleanSong[] = await res.json();
+  setSongs(data.map(s => ({ _id: s._id, title: s.title, folder: (s as any).folder, images: s.images, videoUrl: s.videoUrl })));
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Unbekannter Fehler');
     } finally {
       setLoading(false);
-      // Hintergrund: vollständige Daten nachladen
-      fetchSongsFull();
     }
-  }, [contentType, fetchSongsFull]);
+  }, [contentType]);
 
-  useEffect(() => { if (isAuthenticated) fetchSongsFast(); }, [isAuthenticated, contentType, fetchSongsFast]);
+  useEffect(() => { if (isAuthenticated) fetchSongs(); }, [isAuthenticated, contentType, fetchSongs]);
 
   const songsForLetter = useCallback((letter: string) => {
     const list = letter === '1' ? songs.filter(s => /^\d/.test(s.title)) : songs.filter(s => s.title.toUpperCase().startsWith(letter));
@@ -70,7 +48,7 @@ export default function SongList() {
   const availableLetters = useCallback(() => { const used = new Set(songs.map(s => s.title[0]?.toUpperCase())); const out: string[] = []; if (songs.some(s => /^\d/.test(s.title))) out.push('1'); LETTERS.forEach(l => used.has(l) && out.push(l)); return out; }, [songs]);
 
   useEffect(() => {
-    if (!keyboardEnabled) return; const h = (e: KeyboardEvent) => {
+  if (!keyboardEnabled) return; const h = (e: KeyboardEvent) => {
       const key = e.key.toLowerCase();
       if (key === 'h') { e.preventDefault(); setSelectedLetter(null); setSelectedSong(null); }
       else if (key === 'escape') { e.preventDefault(); if (selectedSong) setSelectedSong(null); else if (selectedLetter) setSelectedLetter(null); }
@@ -92,7 +70,20 @@ export default function SongList() {
       <div className="flex-grow-1 d-flex justify-content-center px-4" style={{ paddingBottom: 20 }}>
         <div className="text-center" style={{ maxWidth: 1500 }}>
           <div style={{ marginBottom: 20 }}><button className="btn btn-lg text-white" style={{ background: '#4a4a4a', border: '2px solid #6a6a6a', width: 120, height: 100, borderRadius: 14 }} onClick={() => setSelectedLetter(null)}>←</button></div>
-          {list.length === 0 ? <div className="text-white">Keine Songs</div> : <div className="d-flex flex-wrap justify-content-center">{list.map(s => <button key={s._id} className="btn btn-lg text-white" style={{ background: '#6a6a6a', border: '2px solid #8a8a8a', width: 288, height: 100, borderRadius: 14, margin: 5, padding: '15px 20px' }} onClick={() => setSelectedSong(s)}>{s.title}</button>)}</div>}
+          {list.length === 0 ? <div className="text-white">Keine Songs</div> : <div className="d-flex flex-wrap justify-content-center">{list.map(s => <button key={s._id} className="btn btn-lg text-white" style={{ background: '#6a6a6a', border: '2px solid #8a8a8a', width: 288, height: 100, borderRadius: 14, margin: 5, padding: '15px 20px' }} onClick={async () => {
+            if (!s.images && contentType !== 'videos') {
+              try {
+                const r = await fetch(`/api/song?folder=${encodeURIComponent(s.folder || s._id)}&type=${contentType}`);
+                if (r.ok) {
+                  const full = await r.json();
+                  setSongs(prev => prev.map(p => p._id === s._id ? { ...p, images: full.images } : p));
+                  setSelectedSong({ ...s, images: full.images });
+                  return;
+                }
+              } catch {}
+            }
+            setSelectedSong(s);
+          }}>{s.title}</button>)}</div>}
         </div>
       </div>
       <div className="flex-shrink-0 d-flex justify-content-center align-items-center px-4" style={{ paddingBottom: 30, position: 'relative' }}>
@@ -102,7 +93,7 @@ export default function SongList() {
     </div> ); }
   const avail = availableLetters();
   if (loading && songs.length === 0) return <div className="d-flex justify-content-center align-items-center" style={{ height: '100vh', background: '#1a1a1a', color: '#fff' }}>Lade Songs...</div>;
-  if (error) return <div className="d-flex justify-content-center align-items-center" style={{ height: '100vh', background: '#1a1a1a', color: '#fff' }}><div className="text-center"><h3 className="text-danger">Fehler</h3><p>{error}</p><button className="btn btn-primary" onClick={fetchSongsFast}>Erneut</button></div></div>;
+  if (error) return <div className="d-flex justify-content-center align-items-center" style={{ height: '100vh', background: '#1a1a1a', color: '#fff' }}><div className="text-center"><h3 className="text-danger">Fehler</h3><p>{error}</p><button className="btn btn-primary" onClick={fetchSongs}>Erneut</button></div></div>;
   return (
     <div className="d-flex flex-column" style={{ height: '100vh', background: '#1a1a1a' }}>
       <div className="flex-shrink-0 px-4 text-center text-white" style={{ paddingTop: 60, paddingBottom: 20 }}>
