@@ -20,6 +20,7 @@ export async function GET(request: Request) {
   try {
     const songsCol = await getSongsCollection();
   const publicBase = null; // Proxy erzwingen für Bilder
+  const client = isWebdavEnabled() ? getWebdavClient() : null;
     if (songsCol) {
       const doc = await songsCol.findOne({ category, folder });
       if (doc && doc.images && doc.images.length) {
@@ -43,6 +44,46 @@ export async function GET(request: Request) {
         res.headers.set('ETag', etag);
         return res;
       }
+      // Erweiterter Fuzzy-Fallback: Ähnliche Ordnernamen in beiden Kategorien suchen (z. B. "Millionär (Die Prinzen)" ≈ "Millionär")
+      const norm = (s: string) => s.toLowerCase().replace(/\s*\([^)]*\)\s*/g, '').replace(/\s+/g, ' ').trim();
+      const wanted = norm(folder);
+      const tryMatchIn = async (cat: 'noten'|'texte') => {
+        if (!client) return null as NextResponse | null;
+        for (const b of [`/${cat}`, `/${cat.charAt(0).toUpperCase()}${cat.slice(1)}`]) {
+          try {
+            const dirEntries = await client.getDirectoryContents(b).catch(()=>[]) as WebDavEntry[];
+            const folders = dirEntries.filter(e=> e.type==='directory').map(e=> e.basename);
+            const match = folders.find(name => norm(name) === wanted);
+            if (match) {
+              const list = await client.getDirectoryContents(`${b}/${match}`).catch(()=>[]) as WebDavEntry[];
+              if (list.length) {
+                const imgs = list.filter(f=> f.type==='file' && IMAGE_EXTENSIONS.includes(path.extname(f.basename).toLowerCase()))
+                  .sort((a,b)=>a.basename.localeCompare(b.basename)).map(f=>f.basename);
+                if (imgs.length) {
+                  if (songsCol) {
+                    await songsCol.updateOne({ category: cat, folder: match }, { $set: { images: imgs, imageCount: imgs.length, updatedAt: new Date(), title: match } }, { upsert: true });
+                  }
+                  const images = imgs.map(img => {
+                    const segs = [cat, match, img].map(s => encodeURIComponent((s || '')));
+                    const relative = `${segs[0]}/${segs[1]}/${segs[2]}`;
+                    return `/api/webdav-file?path=${relative}`;
+                  });
+                  const etag = `W/"song-${cat}-${match}-${images.length}-${Date.now()}"`;
+                  const res = NextResponse.json({ _id: match.toLowerCase().replace(/\s+/g,'-'), title: match, images });
+                  res.headers.set('Cache-Control', 'public, max-age=120, stale-while-revalidate=600');
+                  res.headers.set('ETag', etag);
+                  return res;
+                }
+              }
+            }
+          } catch {}
+        }
+        return null as NextResponse | null;
+      };
+      const fuzzyPrimary = await tryMatchIn(category);
+      if (fuzzyPrimary) return fuzzyPrimary;
+      const fuzzyAlt = await tryMatchIn(category === 'noten' ? 'texte' : 'noten');
+      if (fuzzyAlt) return fuzzyAlt;
     }
     // Fallback: direkt WebDAV lesen (und ggf. DB aktualisieren)
     if (isWebdavEnabled()) {
