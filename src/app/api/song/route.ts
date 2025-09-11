@@ -20,6 +20,7 @@ export async function GET(request: Request) {
   try {
     const songsCol = await getSongsCollection();
   const publicBase = null; // Proxy erzwingen für Bilder
+  const enc = (s: string) => encodeURIComponent(s);
   const client = isWebdavEnabled() ? getWebdavClient() : null;
     if (songsCol) {
       const doc = await songsCol.findOne({ category, folder });
@@ -32,7 +33,7 @@ export async function GET(request: Request) {
           const segs = [category, doc.folder, img].map(s => encodeURIComponent((s || '')));
           return `/images/${segs[0]}/${segs[1]}/${segs[2]}`;
         }));
-        const etag = `W/"song-${category}-${folder}-${images.length}-${doc.updatedAt?.valueOf?.() || Date.now()}"`;
+  const etag = `W/"song-${category}-${enc(folder)}-${images.length}-${doc.updatedAt?.valueOf?.() || Date.now()}"`;
         if (request.headers.get('if-none-match') === etag) {
           const notMod = new NextResponse(null, { status: 304 });
           notMod.headers.set('ETag', etag);
@@ -117,7 +118,7 @@ export async function GET(request: Request) {
           const relative = `${segs[0]}/${segs[1]}/${segs[2]}`;
           return `/api/webdav-file?path=${relative}`;
         });
-        const etag = `W/"song-${category}-${actualFolder || folder}-${images.length}-${Date.now()}"`;
+  const etag = `W/"song-${category}-${enc(actualFolder || folder)}-${images.length}-${Date.now()}"`;
         if (request.headers.get('if-none-match') === etag) {
           const notMod = new NextResponse(null, { status: 304 });
           notMod.headers.set('ETag', etag);
@@ -145,7 +146,7 @@ export async function GET(request: Request) {
             if (songsCol && imgs.length) {
               await songsCol.updateOne({ category: altCategory, folder }, { $set: { images: imgs, imageCount: imgs.length, updatedAt: new Date(), title: folder } }, { upsert: true });
             }
-            const etag = `W/"song-${altCategory}-${folder}-${images.length}-${Date.now()}"`;
+            const etag = `W/"song-${altCategory}-${enc(folder)}-${images.length}-${Date.now()}"`;
             const res = NextResponse.json({ _id: folder.toLowerCase().replace(/\s+/g,'-'), title: folder, images });
             res.headers.set('Cache-Control', 'public, max-age=120, stale-while-revalidate=600');
             res.headers.set('ETag', etag);
