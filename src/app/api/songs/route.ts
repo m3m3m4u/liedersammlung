@@ -73,17 +73,16 @@ export async function GET(request: Request) {
   interface SongDocLite { _id?: unknown; category: 'noten' | 'texte'; folder: string; title: string; images?: string[]; createdAt?: Date; updatedAt?: Date; imageCount?: number; }
   // Helper zum Konstruieren finaler JSON Antwort
   const buildResponse = (docs: SongDocLite[]) => {
-        const publicBase = buildPublicUrl('');
+  const publicBase = null; // Erzwinge Proxy-Nutzung für zuverlässige Umlaute-Unterstützung
         return docs.map(d => {
           const imgs = (d.images || []) as string[];
           let images: string[] | undefined;
           if (!minimal) {
             images = isWebdavEnabled()
-        ? imgs.map(img => {
-          const segs = [type, d.folder, img].map(s => encodeURIComponent((s || '')));
+              ? imgs.map(img => {
+                  const segs = [type, d.folder, img].map(s => encodeURIComponent((s || '')));
                   const relative = `${segs[0]}/${segs[1]}/${segs[2]}`;
-                  // Wenn Public-Base gesetzt, ist relative bereits percent-encoded
-                  return publicBase ? `${publicBase}${relative}` : `/api/webdav-file?path=${relative}`;
+                  return `/api/webdav-file?path=${relative}`;
                 })
         : imgs.map(img => {
           const segs = [type, d.folder, img].map(s => encodeURIComponent((s || '')));

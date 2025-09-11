@@ -19,14 +19,14 @@ export async function GET(request: Request) {
   if (!folder) return NextResponse.json({ error: 'folder missing' }, { status: 400 });
   try {
     const songsCol = await getSongsCollection();
-    const publicBase = buildPublicUrl('');
+  const publicBase = null; // Proxy erzwingen für Bilder
     if (songsCol) {
       const doc = await songsCol.findOne({ category, folder });
       if (doc && doc.images && doc.images.length) {
         const images = (isWebdavEnabled() ? doc.images.map(img => {
           const segs = [category, doc.folder, img].map(s => encodeURIComponent((s || '')));
           const relative = `${segs[0]}/${segs[1]}/${segs[2]}`;
-          return publicBase ? `${publicBase}${relative}` : `/api/webdav-file?path=${relative}`;
+          return `/api/webdav-file?path=${relative}`;
         }) : doc.images.map(img => {
           const segs = [category, doc.folder, img].map(s => encodeURIComponent((s || '')));
           return `/images/${segs[0]}/${segs[1]}/${segs[2]}`;
@@ -64,7 +64,7 @@ export async function GET(request: Request) {
         const images = imgs.map(img => {
           const segs = [category, folder, img].map(s => encodeURIComponent((s || '')));
           const relative = `${segs[0]}/${segs[1]}/${segs[2]}`;
-          return publicBase ? `${publicBase}${relative}` : `/api/webdav-file?path=${relative}`;
+          return `/api/webdav-file?path=${relative}`;
         });
         const etag = `W/"song-${category}-${folder}-${images.length}-${Date.now()}"`;
         if (request.headers.get('if-none-match') === etag) {

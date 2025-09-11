@@ -18,8 +18,8 @@ export async function GET(request: NextRequest) {
   const rawParam = searchParams.get('path');
   const rel = rawParam ? decodeURIComponent(rawParam) : null;
   if (!rel) return NextResponse.json({ message: 'path erforderlich' }, { status: 400 });
-  // Erlaube Umlaute und diverse Unicode-Zeichen in Dateinamen
-  if (!/^((noten|texte)\/[\p{L}\p{N}\p{M}\p{Pc}\p{Pd}\s\._()'&+,-]+\.(jpg|jpeg|png|gif|webp))$/iu.test(rel)) {
+  // Erlaube Umlaute und diverse Unicode-Zeichen in Ordner- und Dateinamen (zwei Segmente: Kategorie/Ordner/Datei)
+  if (!/^((noten|texte)\/[\p{L}\p{N}\p{M}\p{Pc}\p{Pd}\s._()'&+,~\-]+\/[\p{L}\p{N}\p{M}\p{Pc}\p{Pd}\s._()'&+,~\-]+\.(jpg|jpeg|png|gif|webp))$/iu.test(rel)) {
     return NextResponse.json({ message: 'Ungültiger oder nicht erlaubter Pfad' }, { status: 400 });
   }
   try {
