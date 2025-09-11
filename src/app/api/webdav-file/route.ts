@@ -15,7 +15,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ message: 'WebDAV nicht aktiv' }, { status: 400 });
   }
   const { searchParams } = new URL(request.url);
-  const rel = searchParams.get('path');
+  const rawParam = searchParams.get('path');
+  const rel = rawParam ? decodeURIComponent(rawParam) : null;
   if (!rel) return NextResponse.json({ message: 'path erforderlich' }, { status: 400 });
   // Erlaube Umlaute und diverse Unicode-Zeichen in Dateinamen
   if (!/^((noten|texte)\/[\p{L}\p{N}\p{M}\p{Pc}\p{Pd}\s\._()'&+,-]+\.(jpg|jpeg|png|gif|webp))$/iu.test(rel)) {
@@ -23,8 +24,8 @@ export async function GET(request: NextRequest) {
   }
   try {
     const client = getWebdavClient();
-    // WebDAV erwartet raw UTF-8 (nicht vorab percent-encodet). Wir normalisieren zu NFC.
-    const davPath = '/' + rel.normalize('NFC');
+  // WebDAV erwartet raw UTF-8; wir verwenden den exakt dekodierten Pfad ohne Normalisierung.
+  const davPath = '/' + rel;
     const data = await client.getFileContents(davPath, { format: 'binary' });
     const ext = path.extname(rel).toLowerCase();
     const mime = mimeMap[ext] || 'application/octet-stream';

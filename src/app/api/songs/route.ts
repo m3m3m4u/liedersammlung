@@ -79,14 +79,14 @@ export async function GET(request: Request) {
           let images: string[] | undefined;
           if (!minimal) {
             images = isWebdavEnabled()
-              ? imgs.map(img => {
-                  const segs = [type, d.folder, img].map(s => encodeURIComponent((s || '').normalize('NFC')));
+        ? imgs.map(img => {
+          const segs = [type, d.folder, img].map(s => encodeURIComponent((s || '')));
                   const relative = `${segs[0]}/${segs[1]}/${segs[2]}`;
                   // Wenn Public-Base gesetzt, ist relative bereits percent-encoded
                   return publicBase ? `${publicBase}${relative}` : `/api/webdav-file?path=${relative}`;
                 })
-              : imgs.map(img => {
-                  const segs = [type, d.folder, img].map(s => encodeURIComponent((s || '').normalize('NFC')));
+        : imgs.map(img => {
+          const segs = [type, d.folder, img].map(s => encodeURIComponent((s || '')));
                   return `/images/${segs[0]}/${segs[1]}/${segs[2]}`;
                 });
           }

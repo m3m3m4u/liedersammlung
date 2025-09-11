@@ -24,11 +24,11 @@ export async function GET(request: Request) {
       const doc = await songsCol.findOne({ category, folder });
       if (doc && doc.images && doc.images.length) {
         const images = (isWebdavEnabled() ? doc.images.map(img => {
-          const segs = [category, doc.folder, img].map(s => encodeURIComponent((s || '').normalize('NFC')));
+          const segs = [category, doc.folder, img].map(s => encodeURIComponent((s || '')));
           const relative = `${segs[0]}/${segs[1]}/${segs[2]}`;
           return publicBase ? `${publicBase}${relative}` : `/api/webdav-file?path=${relative}`;
         }) : doc.images.map(img => {
-          const segs = [category, doc.folder, img].map(s => encodeURIComponent((s || '').normalize('NFC')));
+          const segs = [category, doc.folder, img].map(s => encodeURIComponent((s || '')));
           return `/images/${segs[0]}/${segs[1]}/${segs[2]}`;
         }));
         const etag = `W/"song-${category}-${folder}-${images.length}-${doc.updatedAt?.valueOf?.() || Date.now()}"`;
@@ -62,7 +62,7 @@ export async function GET(request: Request) {
           await songsCol.updateOne({ category, folder }, { $set: { images: imgs, imageCount: imgs.length, updatedAt: new Date() } });
         }
         const images = imgs.map(img => {
-          const segs = [category, folder, img].map(s => encodeURIComponent((s || '').normalize('NFC')));
+          const segs = [category, folder, img].map(s => encodeURIComponent((s || '')));
           const relative = `${segs[0]}/${segs[1]}/${segs[2]}`;
           return publicBase ? `${publicBase}${relative}` : `/api/webdav-file?path=${relative}`;
         });
