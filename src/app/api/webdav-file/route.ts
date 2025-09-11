@@ -17,12 +17,15 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const rel = searchParams.get('path');
   if (!rel) return NextResponse.json({ message: 'path erforderlich' }, { status: 400 });
-  if (!/^((noten|texte)\/[^\n]+\.(jpg|jpeg|png|gif|webp))$/i.test(rel)) {
+  // Erlaube Umlaute und diverse Unicode-Zeichen in Dateinamen
+  if (!/^((noten|texte)\/[\p{L}\p{N}\p{M}\p{Pc}\p{Pd}\s\._()'&+,-]+\.(jpg|jpeg|png|gif|webp))$/iu.test(rel)) {
     return NextResponse.json({ message: 'Ungültiger oder nicht erlaubter Pfad' }, { status: 400 });
   }
   try {
     const client = getWebdavClient();
-  const data = await client.getFileContents('/' + rel, { format: 'binary' });
+    // WebDAV erwartet raw UTF-8 (nicht vorab percent-encodet). Wir normalisieren zu NFC.
+    const davPath = '/' + rel.normalize('NFC');
+    const data = await client.getFileContents(davPath, { format: 'binary' });
     const ext = path.extname(rel).toLowerCase();
     const mime = mimeMap[ext] || 'application/octet-stream';
   return new NextResponse(data as ArrayBuffer, { headers: { 'Content-Type': mime, 'Cache-Control': 'public, max-age=3600' } });

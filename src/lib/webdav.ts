@@ -21,7 +21,10 @@ export function getWebdavClient(): WebDAVClient {
 export function buildPublicUrl(relativePath: string): string | null {
   const base = process.env.STORAGEBOX_PUBLIC_BASE_URL;
   if (!base) return null;
-  return `${base.replace(/\/$/, '')}/${relativePath.replace(/^\//, '')}`;
+  // Unicode sicher: normalisieren und pro Segment encoden
+  const normalized = relativePath.normalize('NFC').replace(/^\/+/, '');
+  const encoded = normalized.split('/').map(encodeURIComponent).join('/');
+  return `${base.replace(/\/$/, '')}/${encoded}`;
 }
 
 export async function ensureDirectories(client: WebDAVClient, dirs: string[]) {

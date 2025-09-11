@@ -24,9 +24,13 @@ export async function GET(request: Request) {
       const doc = await songsCol.findOne({ category, folder });
       if (doc && doc.images && doc.images.length) {
         const images = (isWebdavEnabled() ? doc.images.map(img => {
-          const relative = `${category}/${doc.folder}/${img}`;
-          return publicBase ? buildPublicUrl(relative)! : `/api/webdav-file?path=${encodeURIComponent(relative)}`;
-        }) : doc.images.map(img => `/images/${category}/${doc.folder}/${img}`));
+          const segs = [category, doc.folder, img].map(s => encodeURIComponent((s || '').normalize('NFC')));
+          const relative = `${segs[0]}/${segs[1]}/${segs[2]}`;
+          return publicBase ? `${publicBase}${relative}` : `/api/webdav-file?path=${relative}`;
+        }) : doc.images.map(img => {
+          const segs = [category, doc.folder, img].map(s => encodeURIComponent((s || '').normalize('NFC')));
+          return `/images/${segs[0]}/${segs[1]}/${segs[2]}`;
+        }));
         const etag = `W/"song-${category}-${folder}-${images.length}-${doc.updatedAt?.valueOf?.() || Date.now()}"`;
         if (request.headers.get('if-none-match') === etag) {
           const notMod = new NextResponse(null, { status: 304 });
@@ -58,8 +62,9 @@ export async function GET(request: Request) {
           await songsCol.updateOne({ category, folder }, { $set: { images: imgs, imageCount: imgs.length, updatedAt: new Date() } });
         }
         const images = imgs.map(img => {
-          const relative = `${category}/${folder}/${img}`;
-          return publicBase ? buildPublicUrl(relative)! : `/api/webdav-file?path=${encodeURIComponent(relative)}`;
+          const segs = [category, folder, img].map(s => encodeURIComponent((s || '').normalize('NFC')));
+          const relative = `${segs[0]}/${segs[1]}/${segs[2]}`;
+          return publicBase ? `${publicBase}${relative}` : `/api/webdav-file?path=${relative}`;
         });
         const etag = `W/"song-${category}-${folder}-${images.length}-${Date.now()}"`;
         if (request.headers.get('if-none-match') === etag) {
