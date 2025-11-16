@@ -1,4 +1,4 @@
-import { MongoClient, Db, Collection } from 'mongodb';
+import { MongoClient, Db, Collection, ObjectId } from 'mongodb';
 
 declare global {
   var _mongoClientPromise: Promise<MongoClient> | undefined;
@@ -55,7 +55,7 @@ export interface VideoDoc {
 }
 
 export interface SongDoc {
-  _id?: string;
+  _id?: ObjectId | string;
   category: 'noten' | 'texte';
   folder: string; // Verzeichnisname auf WebDAV
   title: string;  // Anzeigename

@@ -45,11 +45,13 @@ export default function SongUpload({ onBack, onUploadSuccess }: SongUploadProps)
     setIsDragging(false);
     
     const files = Array.from(e.dataTransfer.files);
-    const zipFiles = files.filter(file => file.name.toLowerCase().endsWith('.zip'));
+    const validFiles = files.filter(file => 
+      file.name.toLowerCase().endsWith('.zip')
+    );
     
-    if (zipFiles.length > 0) {
-      setSelectedFiles(zipFiles);
-      setMessage(`📁 ${zipFiles.length} ZIP-Datei(en) ausgewählt`);
+    if (validFiles.length > 0) {
+      setSelectedFiles(validFiles);
+      setMessage(`📁 ${validFiles.length} Datei(en) ausgewählt`);
     } else {
       setMessage('❌ Bitte nur ZIP-Dateien hochladen!');
     }
@@ -57,11 +59,13 @@ export default function SongUpload({ onBack, onUploadSuccess }: SongUploadProps)
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files ? Array.from(e.target.files) : [];
-    const zipFiles = files.filter(file => file.name.toLowerCase().endsWith('.zip'));
+    const validFiles = files.filter(file => 
+      file.name.toLowerCase().endsWith('.zip')
+    );
     
-    if (zipFiles.length > 0) {
-      setSelectedFiles(zipFiles);
-      setMessage(`📁 ${zipFiles.length} ZIP-Datei(en) ausgewählt`);
+    if (validFiles.length > 0) {
+      setSelectedFiles(validFiles);
+      setMessage(`📁 ${validFiles.length} Datei(en) ausgewählt`);
     } else {
       setMessage('❌ Bitte ZIP-Dateien auswählen!');
     }
@@ -431,7 +435,7 @@ export default function SongUpload({ onBack, onUploadSuccess }: SongUploadProps)
                   </div>
                   <h5 className="text-white mb-3">
                     {selectedFiles.length > 0 
-                      ? `${selectedFiles.length} ZIP-Datei(en) ausgewählt` 
+                      ? `${selectedFiles.length} Datei(en) ausgewählt` 
                       : 'ZIP-Dateien hier hinziehen oder klicken zum Auswählen'
                     }
                   </h5>

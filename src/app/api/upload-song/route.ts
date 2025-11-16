@@ -5,7 +5,12 @@ import AdmZip from 'adm-zip';
 import { getWebdavClient, isWebdavEnabled, ensureDirectories, IMAGE_EXTENSIONS } from '../../../lib/webdav';
 import { getSongsCollection } from '../../../lib/mongo';
 
-async function uploadImagesWebdav(type: string, songName: string, files: { name: string; data: Buffer }[]) {
+interface ExtractedFile {
+  name: string;
+  data: Buffer;
+}
+
+async function uploadImagesWebdav(type: string, songName: string, files: ExtractedFile[]) {
   const client = getWebdavClient();
   const baseDir = `/${type}`;
   const songDir = `${baseDir}/${songName}`;
@@ -19,6 +24,7 @@ async function uploadImagesWebdav(type: string, songName: string, files: { name:
   }
   return count;
 }
+
 
 async function upsertSongMetadata(category: 'noten' | 'texte', folder: string, imageNames: string[]) {
   const col = await getSongsCollection();
@@ -34,34 +40,38 @@ async function upsertSongMetadata(category: 'noten' | 'texte', folder: string, i
 export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
-    const zipFile = formData.get('zipFile') as File;
+    const uploadFile = formData.get('zipFile') as File;
     const type = formData.get('type') as string;
 
-    if (!zipFile) {
-      return NextResponse.json({ message: 'Keine ZIP-Datei gefunden' }, { status: 400 });
+    if (!uploadFile) {
+      return NextResponse.json({ message: 'Keine Datei gefunden' }, { status: 400 });
     }
 
     if (type !== 'noten' && type !== 'texte') {
       return NextResponse.json({ message: 'Ungültige Kategorie' }, { status: 400 });
     }
 
-    // ZIP-Datei lesen
-    const bytes = await zipFile.arrayBuffer();
+    // Datei lesen
+    const bytes = await uploadFile.arrayBuffer();
     const buffer = Buffer.from(bytes);
 
-    // ZIP entpacken
-    const zip = new AdmZip(buffer);
-    const zipEntries = zip.getEntries();
+    const fileName = uploadFile.name.toLowerCase();
+    if (!fileName.endsWith('.zip')) {
+      return NextResponse.json({ message: 'Bitte nur ZIP-Dateien hochladen.' }, { status: 400 });
+    }
 
-  // Song-Namen aus ZIP-Dateiname extrahieren (ohne .zip)
-    const songName = zipFile.name.replace(/\.zip$/i, '');
+    // Song-Namen extrahieren (ohne ZIP-Endung)
+    const songName = uploadFile.name.replace(/\.zip$/i, '');
     
     // Dateien sammeln
-    const extracted: { name: string; data: Buffer }[] = [];
+    const extracted: ExtractedFile[] = [];
+    const zip = new AdmZip(buffer);
+    const zipEntries = zip.getEntries();
+    
     for (const entry of zipEntries) {
       if (!entry.isDirectory) {
-        const fileName = path.basename(entry.entryName);
-        extracted.push({ name: fileName, data: entry.getData() });
+        const innerName = path.basename(entry.entryName);
+        extracted.push({ name: innerName, data: entry.getData() });
       }
     }
 
@@ -92,7 +102,7 @@ export async function POST(request: NextRequest) {
 
     if (extractedCount === 0) {
       return NextResponse.json({ 
-        message: 'Keine Bilddateien in der ZIP gefunden' 
+        message: 'Keine gültigen Bilder in der ZIP-Datei gefunden.' 
       }, { status: 400 });
     }
 

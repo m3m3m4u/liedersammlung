@@ -33,16 +33,12 @@ export default function SongDetail({ song, onBack, onHome }: SongDetailProps) {
   useEffect(() => {
     const calculateAvailableHeight = () => {
       const windowHeight = window.innerHeight;
-      // Reduzierte Höhen für mehr Platz für das Bild
-      const headerHeight = 60; // Header
-      const navigationHeight = 90; // Navigation buttons
-      const footerHeight = 40; // Footer
-      const padding = 20; // Padding
-      
+      const headerHeight = 60;
+      const navigationHeight = 70;
+      const footerHeight = 40;
+      const padding = 8;
       const available = windowHeight - headerHeight - navigationHeight - footerHeight - padding;
-      setAvailableHeight(Math.max(available, 500)); // Mindestens 500px
-      
-      console.log('Verfügbare Höhe für Bild:', available + 'px');
+      setAvailableHeight(Math.max(available, 500));
     };
 
     calculateAvailableHeight();
@@ -399,8 +395,9 @@ export default function SongDetail({ song, onBack, onHome }: SongDetailProps) {
           alignItems: 'center',
           width: '100%', 
           textAlign: 'center',
-          marginBottom: '10px',
-          position: 'relative'
+          marginBottom: '4px',
+          position: 'relative',
+          padding: '0 6px'
         }}>
           <Image
             key={currentImageIndex}
@@ -409,12 +406,12 @@ export default function SongDetail({ song, onBack, onHome }: SongDetailProps) {
             width={1200}
             height={900}
             style={{ 
-              height: availableHeight > 0 ? `${availableHeight}px` : '750px', // Nutzt die volle verfügbare Höhe
-              maxWidth: 'calc(100vw - 40px)', // Passt in die Fensterbreite
+              height: availableHeight > 0 ? `${availableHeight + 40}px` : '750px',
+              maxWidth: 'calc(100vw - 12px)',
               width: 'auto',
               objectFit: 'contain',
-              filter: 'drop-shadow(0 2px 4px rgba(255,255,255,0.05))',
-              borderRadius: '4px',
+              filter: 'none',
+              borderRadius: '2px',
               display: 'block',
               margin: '0 auto',
               // Übergang für smooth loading bei preloaded images

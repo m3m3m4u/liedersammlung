@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { readdir, access, readFile } from 'fs/promises';
 import { constants } from 'fs';
 import path from 'path';
+import { ObjectId } from 'mongodb';
 import { getWebdavClient, isWebdavEnabled, buildPublicUrl, IMAGE_EXTENSIONS } from '../../../lib/webdav';
 import { getVideoCollection, getSongsCollection } from '../../../lib/mongo';
 
@@ -70,7 +71,20 @@ export async function GET(request: Request) {
     
   if (type === 'noten' || type === 'texte') {
   const songsCol = await getSongsCollection();
-  interface SongDocLite { _id?: unknown; category: 'noten' | 'texte'; folder: string; title: string; images?: string[]; createdAt?: Date; updatedAt?: Date; imageCount?: number; }
+  interface SongDocLite {
+    _id?: unknown;
+    category: 'noten' | 'texte';
+    folder: string;
+    title: string;
+    images?: string[];
+    createdAt?: Date;
+    updatedAt?: Date;
+    imageCount?: number;
+    isChristmas?: boolean;
+    languageGerman?: boolean;
+    languageEnglish?: boolean;
+    languageOther?: boolean;
+  }
   // Helper zum Konstruieren finaler JSON Antwort
   const buildResponse = (docs: SongDocLite[]) => {
   const publicBase = null; // Erzwinge Proxy-Nutzung für zuverlässige Umlaute-Unterstützung
@@ -89,7 +103,21 @@ export async function GET(request: Request) {
                   return `/images/${segs[0]}/${segs[1]}/${segs[2]}`;
                 });
           }
-          return { _id: d.folder.toLowerCase().replace(/\s+/g,'-'), title: d.title, images, folder: d.folder };
+          const slug = d.folder.toLowerCase().replace(/\s+/g,'-');
+          const id = d._id instanceof ObjectId ? d._id.toHexString() : (d._id ? String(d._id) : slug);
+          return {
+            _id: id,
+            slug,
+            title: d.title,
+            images,
+            folder: d.folder,
+            category: d.category,
+            imageCount: d.imageCount ?? imgs.length,
+            isChristmas: Boolean(d.isChristmas),
+            languageGerman: Boolean(d.languageGerman),
+            languageEnglish: Boolean(d.languageEnglish),
+            languageOther: Boolean(d.languageOther)
+          };
         });
       };
       if (songsCol) {
