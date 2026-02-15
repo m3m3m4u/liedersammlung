@@ -1,9 +1,7 @@
 import { NextResponse } from 'next/server';
-import { readdir, access, readFile } from 'fs/promises';
-import { constants } from 'fs';
 import path from 'path';
 import { ObjectId } from 'mongodb';
-import { getWebdavClient, isWebdavEnabled, buildPublicUrl, IMAGE_EXTENSIONS } from '../../../lib/webdav';
+import { getWebdavClient, isWebdavEnabled, IMAGE_EXTENSIONS } from '../../../lib/webdav';
 import { getMediaCollection, getSongsCollection, type MediaCategory } from '../../../lib/mongo';
 
 // Typisierung für WebDAV Einträge (minimale Felder, Rest generisch)
@@ -52,22 +50,7 @@ export async function GET(request: Request) {
         console.error('Video WebDAV Listing Fehler:', e);
       }
     }
-    // Letzter Fallback: lokales public/<mediaType>
-    const videosDir = path.join(process.cwd(), 'public', mediaType);
-    try { await access(videosDir, constants.F_OK); } catch { return NextResponse.json([]); }
-    try {
-      const files = await readdir(videosDir);
-      const jsonFiles = files.filter(f => f.endsWith('.json'));
-      const videos = await Promise.all(jsonFiles.map(async f => {
-        try {
-          const filePath = path.join(videosDir, f);
-          const raw = await readFile(filePath, 'utf-8');
-          const data = JSON.parse(raw);
-          return { _id: f.replace('.json','').toLowerCase().replace(/\s+/g,'-'), title: data.title || f.replace('.json',''), videoUrl: data.url };
-        } catch { return null; }
-      }));
-      return NextResponse.json(videos.filter(Boolean));
-    } catch { return NextResponse.json([]); }
+    return NextResponse.json([]);
   }
     
   if (type === 'noten' || type === 'texte') {
@@ -88,7 +71,6 @@ export async function GET(request: Request) {
   }
   // Helper zum Konstruieren finaler JSON Antwort
   const buildResponse = (docs: SongDocLite[]) => {
-  const publicBase = null; // Erzwinge Proxy-Nutzung für zuverlässige Umlaute-Unterstützung
         return docs.map(d => {
           const imgs = (d.images || []) as string[];
           let images: string[] | undefined;
