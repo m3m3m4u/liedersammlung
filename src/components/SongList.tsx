@@ -105,7 +105,7 @@ export default function SongList() {
   const hasChristmas = christmasSongs.length > 0 && !isVideoLikeType;
 
   if (!isAuthenticated) return <Login onLogin={() => setIsAuthenticated(true)} />;
-  if (selectedSong) return isVideoLikeType ? <VideoDetail song={selectedSong} onBack={() => setSelectedSong(null)} onHome={() => { setSelectedSong(null); setSelectedLetter(null); setShowChristmas(false); }} /> : <SongDetail song={selectedSong} onBack={() => setSelectedSong(null)} onHome={() => { setSelectedSong(null); setSelectedLetter(null); setShowChristmas(false); }} />;
+  if (selectedSong) return isVideoLikeType ? <VideoDetail song={selectedSong} categoryLabel={contentType === 'boomwhacker' ? 'Boomwhacker' : 'Videos'} onBack={() => setSelectedSong(null)} onHome={() => { setSelectedSong(null); setSelectedLetter(null); setShowChristmas(false); }} /> : <SongDetail song={selectedSong} onBack={() => setSelectedSong(null)} onHome={() => { setSelectedSong(null); setSelectedLetter(null); setShowChristmas(false); }} />;
   if (showChristmas) { const list = christmasSongs.sort((a,b)=>a.title.localeCompare(b.title)); return (
     <div className="d-flex flex-column" style={{ height: '100vh', background: '#1a1a1a' }}>
       <div className="flex-shrink-0 px-4 text-center text-white" style={{ paddingTop: 60, paddingBottom: 40 }}>

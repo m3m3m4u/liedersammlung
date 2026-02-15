@@ -12,6 +12,7 @@ interface VideoDetailProps {
   song: Song;
   onBack: () => void;
   onHome: () => void;
+  categoryLabel?: string;
 }
 
 // Hilfsfunktion um YouTube-URL in Embed-URL zu konvertieren
@@ -28,7 +29,7 @@ function getYouTubeEmbedUrl(url: string): string {
   return url;
 }
 
-export default function VideoDetail({ song, onBack, onHome }: VideoDetailProps) {
+export default function VideoDetail({ song, onBack, onHome, categoryLabel = 'Video' }: VideoDetailProps) {
   // Tastatursteuerung
   useEffect(() => {
     const handleKeyPress = (event: KeyboardEvent) => {
@@ -81,16 +82,21 @@ export default function VideoDetail({ song, onBack, onHome }: VideoDetailProps) 
           ← Zurück
         </button>
         
-        <h1 className="text-center m-0" style={{ 
-          fontSize: '1.8rem', 
-          fontWeight: '300',
-          maxWidth: '60%',
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          whiteSpace: 'nowrap'
-        }}>
-          {song.title}
-        </h1>
+        <div className="text-center m-0" style={{ maxWidth: '60%' }}>
+          <div style={{ fontSize: '0.8rem', color: '#bbb', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+            {categoryLabel}
+          </div>
+          <h1 style={{ 
+            fontSize: '1.8rem', 
+            fontWeight: '300',
+            margin: 0,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap'
+          }}>
+            {song.title}
+          </h1>
+        </div>
         
         <button
           onClick={onHome}
