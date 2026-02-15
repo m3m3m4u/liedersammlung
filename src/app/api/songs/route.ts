@@ -4,7 +4,7 @@ import { constants } from 'fs';
 import path from 'path';
 import { ObjectId } from 'mongodb';
 import { getWebdavClient, isWebdavEnabled, buildPublicUrl, IMAGE_EXTENSIONS } from '../../../lib/webdav';
-import { getVideoCollection, getSongsCollection } from '../../../lib/mongo';
+import { getMediaCollection, getSongsCollection, type MediaCategory } from '../../../lib/mongo';
 
 // Typisierung für WebDAV Einträge (minimale Felder, Rest generisch)
 interface WebDavEntry {
@@ -19,9 +19,10 @@ export async function GET(request: Request) {
   const type = searchParams.get('type') || 'texte'; // Default: texte
   const minimal = searchParams.get('minimal') === '1'; // nur Metadaten (ohne images)
     
-  // Für Videos verwenden wir ein anderes Verzeichnis und JSON-Dateien
-  if (type === 'videos') {
-    const collection = await getVideoCollection();
+  // Für Videos/Boomwhacker verwenden wir ein anderes Verzeichnis und JSON-Dateien
+  if (type === 'videos' || type === 'boomwhacker') {
+    const mediaType = type as MediaCategory;
+    const collection = await getMediaCollection(mediaType);
     if (collection) {
       try {
         const docs = await collection.find({}, { sort: { title: 1 } }).toArray();
@@ -32,15 +33,15 @@ export async function GET(request: Request) {
         console.error('Video DB Query Fehler:', e);
       }
     }
-    // Fallback: WebDAV /videos (falls DB leer oder nicht verfügbar)
+    // Fallback: WebDAV /<mediaType> (falls DB leer oder nicht verfügbar)
     if (isWebdavEnabled()) {
       try {
         const client = getWebdavClient();
-        const entries = await client.getDirectoryContents('/videos').catch(() => []) as WebDavEntry[];
+        const entries = await client.getDirectoryContents(`/${mediaType}`).catch(() => []) as WebDavEntry[];
         const jsonFiles = entries.filter(e => e.type === 'file' && e.basename.endsWith('.json'));
         const videos = await Promise.all(jsonFiles.map(async f => {
           try {
-            const raw = await client.getFileContents(`/videos/${f.basename}`, { format: 'text' }) as string;
+            const raw = await client.getFileContents(`/${mediaType}/${f.basename}`, { format: 'text' }) as string;
             const data = JSON.parse(raw);
             return { _id: f.basename.replace('.json','').toLowerCase().replace(/\s+/g,'-'), title: data.title || f.basename.replace('.json',''), videoUrl: data.url };
           } catch { return null; }
@@ -51,8 +52,8 @@ export async function GET(request: Request) {
         console.error('Video WebDAV Listing Fehler:', e);
       }
     }
-    // Letzter Fallback: lokales public/videos
-    const videosDir = path.join(process.cwd(), 'public', 'videos');
+    // Letzter Fallback: lokales public/<mediaType>
+    const videosDir = path.join(process.cwd(), 'public', mediaType);
     try { await access(videosDir, constants.F_OK); } catch { return NextResponse.json([]); }
     try {
       const files = await readdir(videosDir);

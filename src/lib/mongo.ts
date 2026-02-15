@@ -54,6 +54,8 @@ export interface VideoDoc {
   createdAt: Date;
 }
 
+export type MediaCategory = 'videos' | 'boomwhacker';
+
 export interface SongDoc {
   _id?: ObjectId | string;
   category: 'noten' | 'texte';
@@ -77,9 +79,13 @@ export function makeSlug(title: string): string {
 }
 
 export async function getVideoCollection(): Promise<Collection<VideoDoc> | undefined> {
+  return getMediaCollection('videos');
+}
+
+export async function getMediaCollection(category: MediaCategory): Promise<Collection<VideoDoc> | undefined> {
   const db = await getDb();
   if (!db) return undefined;
-  const col = db.collection<VideoDoc>('videos');
+  const col = db.collection<VideoDoc>(category);
   await col.createIndex({ slug: 1 }, { unique: true }).catch(() => {});
   return col;
 }

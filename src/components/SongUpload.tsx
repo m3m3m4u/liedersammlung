@@ -15,7 +15,8 @@ export default function SongUpload({ onBack, onUploadSuccess }: SongUploadProps)
   const [currentFileIndex, setCurrentFileIndex] = useState(0);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [message, setMessage] = useState('');
-  const [selectedType, setSelectedType] = useState<'noten' | 'texte' | 'videos'>('texte');
+  const [selectedType, setSelectedType] = useState<'noten' | 'texte' | 'videos' | 'boomwhacker'>('texte');
+  const isVideoLikeType = selectedType === 'videos' || selectedType === 'boomwhacker';
   const [uploadResults, setUploadResults] = useState<string[]>([]);
   
   // Video upload specific
@@ -25,7 +26,7 @@ export default function SongUpload({ onBack, onUploadSuccess }: SongUploadProps)
   // Delete functionality
   const [showDeleteSection, setShowDeleteSection] = useState(false);
   const [deleteTitle, setDeleteTitle] = useState('');
-  const [deleteCategory, setDeleteCategory] = useState<'noten' | 'texte' | 'videos'>('texte');
+  const [deleteCategory, setDeleteCategory] = useState<'noten' | 'texte' | 'videos' | 'boomwhacker'>('texte');
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteMessage, setDeleteMessage] = useState('');
   
@@ -176,6 +177,7 @@ export default function SongUpload({ onBack, onUploadSuccess }: SongUploadProps)
       const formData = new FormData();
       formData.append('title', videoTitle.trim());
       formData.append('url', videoUrl.trim());
+      formData.append('category', selectedType === 'boomwhacker' ? 'boomwhacker' : 'videos');
 
       const response = await fetch('/api/upload-video', {
         method: 'POST',
@@ -307,7 +309,7 @@ export default function SongUpload({ onBack, onUploadSuccess }: SongUploadProps)
                       id="uploadTexte"
                       value="texte"
                       checked={selectedType === 'texte'}
-                      onChange={(e) => setSelectedType(e.target.value as 'noten' | 'texte')}
+                      onChange={(e) => setSelectedType(e.target.value as 'noten' | 'texte' | 'videos' | 'boomwhacker')}
                       disabled={isUploading}
                     />
                     <label className="form-check-label text-white" htmlFor="uploadTexte">
@@ -322,7 +324,7 @@ export default function SongUpload({ onBack, onUploadSuccess }: SongUploadProps)
                       id="uploadNoten"
                       value="noten"
                       checked={selectedType === 'noten'}
-                      onChange={(e) => setSelectedType(e.target.value as 'noten' | 'texte' | 'videos')}
+                      onChange={(e) => setSelectedType(e.target.value as 'noten' | 'texte' | 'videos' | 'boomwhacker')}
                       disabled={isUploading}
                     />
                     <label className="form-check-label text-white" htmlFor="uploadNoten">
@@ -337,18 +339,33 @@ export default function SongUpload({ onBack, onUploadSuccess }: SongUploadProps)
                       id="uploadVideos"
                       value="videos"
                       checked={selectedType === 'videos'}
-                      onChange={(e) => setSelectedType(e.target.value as 'noten' | 'texte' | 'videos')}
+                      onChange={(e) => setSelectedType(e.target.value as 'noten' | 'texte' | 'videos' | 'boomwhacker')}
                       disabled={isUploading}
                     />
                     <label className="form-check-label text-white" htmlFor="uploadVideos">
                       🎬 Videos
                     </label>
                   </div>
+                  <div className="form-check">
+                    <input
+                      className="form-check-input"
+                      type="radio"
+                      name="uploadCategory"
+                      id="uploadBoomwhacker"
+                      value="boomwhacker"
+                      checked={selectedType === 'boomwhacker'}
+                      onChange={(e) => setSelectedType(e.target.value as 'noten' | 'texte' | 'videos' | 'boomwhacker')}
+                      disabled={isUploading}
+                    />
+                    <label className="form-check-label text-white" htmlFor="uploadBoomwhacker">
+                      🥁 Boomwhacker
+                    </label>
+                  </div>
                 </div>
               </div>
 
               {/* Upload Area - Videos vs. ZIP */}
-              {selectedType === 'videos' ? (
+              {isVideoLikeType ? (
                 // Video Upload Form
                 <div 
                   className="border-3 border-dashed border-secondary rounded p-5 mb-4"
@@ -357,7 +374,7 @@ export default function SongUpload({ onBack, onUploadSuccess }: SongUploadProps)
                   <div className="mb-3">
                     <i className="fas fa-video" style={{ fontSize: '3rem', color: '#6c757d' }}></i>
                   </div>
-                  <h5 className="text-white mb-4">YouTube-Video hinzufügen</h5>
+                  <h5 className="text-white mb-4">{selectedType === 'boomwhacker' ? 'Boomwhacker-Video hinzufügen' : 'YouTube-Video hinzufügen'}</h5>
                   
                   <div className="mb-3">
                     <label htmlFor="videoTitle" className="form-label text-white">
@@ -426,10 +443,10 @@ export default function SongUpload({ onBack, onUploadSuccess }: SongUploadProps)
                     {isUploading ? (
                       <>
                         <span className="spinner-border spinner-border-sm me-2" role="status"></span>
-                        Video wird hinzugefügt...
+                        {selectedType === 'boomwhacker' ? 'Boomwhacker wird hinzugefügt...' : 'Video wird hinzugefügt...'}
                       </>
                     ) : (
-                      '🎬 Video hinzufügen'
+                      selectedType === 'boomwhacker' ? '🥁 Boomwhacker hinzufügen' : '🎬 Video hinzufügen'
                     )}
                   </button>
                 </div>
@@ -478,7 +495,7 @@ export default function SongUpload({ onBack, onUploadSuccess }: SongUploadProps)
               )}
 
               {/* Rest der Upload-UI - nur für ZIP-Uploads (Noten/Texte) */}
-              {selectedType !== 'videos' && selectedFiles.length > 0 && (
+              {!isVideoLikeType && selectedFiles.length > 0 && (
                 <div className="mb-4">
                   <div className="d-flex justify-content-between align-items-center mb-2">
                     <h6 className="text-white mb-0">Ausgewählte Dateien ({selectedFiles.length}):</h6>
@@ -597,7 +614,7 @@ export default function SongUpload({ onBack, onUploadSuccess }: SongUploadProps)
                       id="deleteTexte"
                       value="texte"
                       checked={deleteCategory === 'texte'}
-                      onChange={(e) => setDeleteCategory(e.target.value as 'noten' | 'texte' | 'videos')}
+                      onChange={(e) => setDeleteCategory(e.target.value as 'noten' | 'texte' | 'videos' | 'boomwhacker')}
                       disabled={isDeleting}
                     />
                     <label className="form-check-label text-white" htmlFor="deleteTexte">
@@ -612,7 +629,7 @@ export default function SongUpload({ onBack, onUploadSuccess }: SongUploadProps)
                       id="deleteNoten"
                       value="noten"
                       checked={deleteCategory === 'noten'}
-                      onChange={(e) => setDeleteCategory(e.target.value as 'noten' | 'texte' | 'videos')}
+                      onChange={(e) => setDeleteCategory(e.target.value as 'noten' | 'texte' | 'videos' | 'boomwhacker')}
                       disabled={isDeleting}
                     />
                     <label className="form-check-label text-white" htmlFor="deleteNoten">
@@ -627,11 +644,26 @@ export default function SongUpload({ onBack, onUploadSuccess }: SongUploadProps)
                       id="deleteVideos"
                       value="videos"
                       checked={deleteCategory === 'videos'}
-                      onChange={(e) => setDeleteCategory(e.target.value as 'noten' | 'texte' | 'videos')}
+                      onChange={(e) => setDeleteCategory(e.target.value as 'noten' | 'texte' | 'videos' | 'boomwhacker')}
                       disabled={isDeleting}
                     />
                     <label className="form-check-label text-white" htmlFor="deleteVideos">
                       🎬 Videos
+                    </label>
+                  </div>
+                  <div className="form-check">
+                    <input
+                      className="form-check-input"
+                      type="radio"
+                      name="deleteCategory"
+                      id="deleteBoomwhacker"
+                      value="boomwhacker"
+                      checked={deleteCategory === 'boomwhacker'}
+                      onChange={(e) => setDeleteCategory(e.target.value as 'noten' | 'texte' | 'videos' | 'boomwhacker')}
+                      disabled={isDeleting}
+                    />
+                    <label className="form-check-label text-white" htmlFor="deleteBoomwhacker">
+                      🥁 Boomwhacker
                     </label>
                   </div>
                 </div>

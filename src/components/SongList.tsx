@@ -14,6 +14,9 @@ interface CleanSong {
   folder?: string;
   isChristmas?: boolean;
 }
+
+type ContentType = 'noten' | 'texte' | 'videos' | 'boomwhacker';
+
 const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
 
 export default function SongList() {
@@ -25,7 +28,7 @@ export default function SongList() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [contentType, setContentType] = useState<'noten' | 'texte' | 'videos'>('texte');
+  const [contentType, setContentType] = useState<ContentType>('texte');
   const [keyboardEnabled, setKeyboardEnabled] = useState(false);
   // Buttons-Array konnte reduziert werden (Direkt generiert beim Rendern) – keine separate Konstante nötig
 
@@ -71,10 +74,11 @@ export default function SongList() {
   }, [keyboardEnabled, selectedLetter, selectedSong, showChristmas, songsForLetter, availableLetters]);
 
   const logout = () => { localStorage.removeItem('notenverwaltung_authenticated'); setIsAuthenticated(false); setSelectedSong(null); setSelectedLetter(null); setShowChristmas(false); };
-  const changeType = (t: 'noten' | 'texte' | 'videos') => { if (t !== contentType) { setContentType(t); setSelectedLetter(null); setSelectedSong(null); setShowChristmas(false); setSongs([]); } };
+  const isVideoLikeType = contentType === 'videos' || contentType === 'boomwhacker';
+  const changeType = (t: ContentType) => { if (t !== contentType) { setContentType(t); setSelectedLetter(null); setSelectedSong(null); setShowChristmas(false); setSongs([]); } };
 
   const openSong = useCallback(async (song: CleanSong) => {
-    if (!song.images && contentType !== 'videos') {
+    if (!song.images && !isVideoLikeType) {
       try {
         const r = await fetch(`/api/song?folder=${encodeURIComponent(song.folder || song._id)}&type=${contentType}`, { cache: 'no-store' });
         if (r.ok) {
@@ -86,7 +90,7 @@ export default function SongList() {
       } catch {}
     }
     setSelectedSong(song);
-  }, [contentType]);
+  }, [contentType, isVideoLikeType]);
 
   const toggleFullscreen = useCallback(() => {
     if (typeof document === 'undefined') return;
@@ -98,10 +102,10 @@ export default function SongList() {
   }, []);
 
   const christmasSongs = songs.filter(s => s.isChristmas);
-  const hasChristmas = christmasSongs.length > 0 && contentType !== 'videos';
+  const hasChristmas = christmasSongs.length > 0 && !isVideoLikeType;
 
   if (!isAuthenticated) return <Login onLogin={() => setIsAuthenticated(true)} />;
-  if (selectedSong) return contentType === 'videos' ? <VideoDetail song={selectedSong} onBack={() => setSelectedSong(null)} onHome={() => { setSelectedSong(null); setSelectedLetter(null); setShowChristmas(false); }} /> : <SongDetail song={selectedSong} onBack={() => setSelectedSong(null)} onHome={() => { setSelectedSong(null); setSelectedLetter(null); setShowChristmas(false); }} />;
+  if (selectedSong) return isVideoLikeType ? <VideoDetail song={selectedSong} onBack={() => setSelectedSong(null)} onHome={() => { setSelectedSong(null); setSelectedLetter(null); setShowChristmas(false); }} /> : <SongDetail song={selectedSong} onBack={() => setSelectedSong(null)} onHome={() => { setSelectedSong(null); setSelectedLetter(null); setShowChristmas(false); }} />;
   if (showChristmas) { const list = christmasSongs.sort((a,b)=>a.title.localeCompare(b.title)); return (
     <div className="d-flex flex-column" style={{ height: '100vh', background: '#1a1a1a' }}>
       <div className="flex-shrink-0 px-4 text-center text-white" style={{ paddingTop: 60, paddingBottom: 40 }}>
@@ -151,7 +155,7 @@ export default function SongList() {
       <div className="flex-shrink-0 px-4 text-white" style={{ paddingTop: 50, paddingBottom: 20 }}>
         <div className="d-flex flex-wrap justify-content-between align-items-center" style={{ gap: 15 }}>
           <h1 className="mb-0 text-center text-md-start" style={{ fontSize: '3rem', fontWeight: 300, flex: '1 1 260px' }}>
-            Liedersammlung mit {contentType === 'noten' ? 'Noten' : contentType === 'videos' ? 'Videos' : 'Texten'}
+            Liedersammlung mit {contentType === 'noten' ? 'Noten' : contentType === 'videos' ? 'Videos' : contentType === 'boomwhacker' ? 'Boomwhacker' : 'Texten'}
           </h1>
           <div className="d-flex" style={{ gap: 10 }}>
             <button onClick={() => router.push('/admin')} className="btn btn-secondary" style={{ minWidth: 120, fontWeight: 600 }}>⚙️ Admin</button>
@@ -160,7 +164,7 @@ export default function SongList() {
         </div>
       </div>
       <div className="d-flex justify-content-center mb-3" style={{ gap: 15 }}>
-        {(['texte','noten','videos'] as const).map(t => <button key={t} onClick={() => changeType(t)} className={`btn btn-lg ${contentType===t?'btn-light':'btn-outline-light'}`} style={{ minWidth: 140, height: 60, fontSize: '1.2rem', fontWeight: 600 }}>{t.charAt(0).toUpperCase() + t.slice(1)}</button>)}
+        {(['texte','noten','videos','boomwhacker'] as const).map(t => <button key={t} onClick={() => changeType(t)} className={`btn btn-lg ${contentType===t?'btn-light':'btn-outline-light'}`} style={{ minWidth: 140, height: 60, fontSize: '1.2rem', fontWeight: 600 }}>{t === 'boomwhacker' ? 'Boomwhacker' : t.charAt(0).toUpperCase() + t.slice(1)}</button>)}
         <button
           onClick={() => setShowChristmas(true)}
           className="btn btn-lg btn-outline-light"

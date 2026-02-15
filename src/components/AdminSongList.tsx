@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 
-type SongCategory = "noten" | "texte" | "videos";
+type SongCategory = "noten" | "texte" | "videos" | "boomwhacker";
 type FilterOption = "alle" | SongCategory;
 type FlagField = "isChristmas" | "languageGerman" | "languageEnglish" | "languageOther";
 
@@ -41,7 +41,8 @@ const FILTERS: { label: string; value: FilterOption }[] = [
   { label: "Alle", value: "alle" },
   { label: "Noten", value: "noten" },
   { label: "Texte", value: "texte" },
-  { label: "Videos", value: "videos" }
+  { label: "Videos", value: "videos" },
+  { label: "Boomwhacker", value: "boomwhacker" }
 ];
 
 export default function AdminSongList() {
@@ -61,10 +62,11 @@ export default function AdminSongList() {
   const fetchSongs = async () => {
     try {
       setLoading(true);
-      const [notenRes, texteRes, videosRes] = await Promise.all([
+      const [notenRes, texteRes, videosRes, boomwhackerRes] = await Promise.all([
         fetch("/api/songs?type=noten&minimal=1"),
         fetch("/api/songs?type=texte&minimal=1"),
-        fetch("/api/songs?type=videos")
+        fetch("/api/songs?type=videos"),
+        fetch("/api/songs?type=boomwhacker")
       ]);
 
       if (!notenRes.ok || !texteRes.ok) {
@@ -76,6 +78,7 @@ export default function AdminSongList() {
         texteRes.json() as Promise<SongResponse[]>
       ]);
       const videos: VideoResponse[] = videosRes.ok ? await videosRes.json() : [];
+      const boomwhacker: VideoResponse[] = boomwhackerRes.ok ? await boomwhackerRes.json() : [];
 
       const mapped: AdminSong[] = [
         ...noten.map((s) => ({
@@ -108,6 +111,13 @@ export default function AdminSongList() {
           category: "videos" as const,
           imageCount: 0,
           videoUrl: v.videoUrl ?? ""
+        })),
+        ...boomwhacker.map((v) => ({
+          _id: v._id,
+          title: v.title,
+          category: "boomwhacker" as const,
+          imageCount: 0,
+          videoUrl: v.videoUrl ?? ""
         }))
       ];
 
@@ -121,7 +131,7 @@ export default function AdminSongList() {
 
   const updateSong = async (songId: string, updates: Partial<AdminSong>) => {
     const target = songs.find(s => s._id === songId);
-    if (!target || target.category === "videos") return;
+    if (!target || target.category === "videos" || target.category === "boomwhacker") return;
 
     try {
       const res = await fetch("/api/update-song", {
@@ -166,18 +176,18 @@ export default function AdminSongList() {
   };
 
   const toggleFlag = (song: AdminSong, field: FlagField) => {
-    if (song.category === "videos") return;
+    if (song.category === "videos" || song.category === "boomwhacker") return;
     updateSong(song._id, { [field]: !song[field] });
   };
 
   const startEdit = (song: AdminSong) => {
-    if (song.category === "videos") return;
+    if (song.category === "videos" || song.category === "boomwhacker") return;
     setEditingId(song._id);
     setEditTitle(song.title);
   };
 
   const saveTitle = (song: AdminSong) => {
-    if (song.category === "videos") return;
+    if (song.category === "videos" || song.category === "boomwhacker") return;
     if (editTitle.trim() && editTitle !== song.title) {
       updateSong(song._id, { title: editTitle.trim() });
     } else {
@@ -192,7 +202,7 @@ export default function AdminSongList() {
   }, [songs, activeFilter, searchTerm]);
 
   const renderCheckbox = (song: AdminSong, field: FlagField) => {
-    if (song.category === "videos") return <span>—</span>;
+    if (song.category === "videos" || song.category === "boomwhacker") return <span>—</span>;
     return (
       <input
         type="checkbox"
@@ -244,7 +254,7 @@ export default function AdminSongList() {
             <tr>
               <th style={{ width: "28%" }}>Titel</th>
               <th style={{ width: "12%" }}>Kategorie</th>
-              <th style={{ width: "8%" }}>{activeFilter === "videos" ? "Typ" : "Bilder"}</th>
+              <th style={{ width: "8%" }}>{activeFilter === "videos" || activeFilter === "boomwhacker" ? "Typ" : "Bilder"}</th>
               <th style={{ width: "10%" }} className="text-center">🎄</th>
               <th style={{ width: "10%" }} className="text-center">🇩🇪</th>
               <th style={{ width: "10%" }} className="text-center">🇬🇧</th>
@@ -272,25 +282,25 @@ export default function AdminSongList() {
                   ) : (
                     <div>
                       <div className="fw-semibold">{song.title}</div>
-                      {song.folder && song.category !== "videos" && (
+                      {song.folder && song.category !== "videos" && song.category !== "boomwhacker" && (
                         <div className="text-muted small">{song.folder}</div>
                       )}
                     </div>
                   )}
                 </td>
                 <td>
-                  <span className={`badge ${song.category === "videos" ? "bg-info" : song.category === "noten" ? "bg-primary" : "bg-success"}`}>
+                  <span className={`badge ${song.category === "videos" ? "bg-info" : song.category === "boomwhacker" ? "bg-warning" : song.category === "noten" ? "bg-primary" : "bg-success"}`}>
                     {song.category}
                   </span>
                 </td>
-                <td>{song.category === "videos" ? "Video" : song.imageCount}</td>
+                <td>{song.category === "videos" || song.category === "boomwhacker" ? "Video" : song.imageCount}</td>
                 <td className="text-center">{renderCheckbox(song, "isChristmas")}</td>
                 <td className="text-center">{renderCheckbox(song, "languageGerman")}</td>
                 <td className="text-center">{renderCheckbox(song, "languageEnglish")}</td>
                 <td className="text-center">{renderCheckbox(song, "languageOther")}</td>
                 <td>
                   <div className="d-flex flex-wrap gap-2">
-                    {song.category === "videos" ? (
+                    {song.category === "videos" || song.category === "boomwhacker" ? (
                       song.videoUrl ? (
                         <a
                           href={song.videoUrl}

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { rm } from 'fs/promises';
 import path from 'path';
 import { getWebdavClient, isWebdavEnabled } from '../../../lib/webdav';
-import { getVideoCollection, makeSlug, getSongsCollection } from '../../../lib/mongo';
+import { getMediaCollection, makeSlug, getSongsCollection, type MediaCategory } from '../../../lib/mongo';
 
 export async function DELETE(request: NextRequest) {
   try {
@@ -14,27 +14,28 @@ export async function DELETE(request: NextRequest) {
       }, { status: 400 });
     }
 
-    if (category !== 'noten' && category !== 'texte' && category !== 'videos') {
+    if (category !== 'noten' && category !== 'texte' && category !== 'videos' && category !== 'boomwhacker') {
       return NextResponse.json({ 
         message: 'Ungültige Kategorie' 
       }, { status: 400 });
     }
 
-    if (category === 'videos') {
-      const collection = await getVideoCollection();
+    if (category === 'videos' || category === 'boomwhacker') {
+      const mediaCategory = category as MediaCategory;
+      const collection = await getMediaCollection(mediaCategory);
       if (collection) {
         const slug = makeSlug(songName);
         const res = await collection.deleteOne({ slug });
         if (res.deletedCount === 0) {
-          return NextResponse.json({ message: `Video "${songName}" wurde nicht gefunden` }, { status: 404 });
+          return NextResponse.json({ message: `${category === 'boomwhacker' ? 'Boomwhacker' : 'Video'} "${songName}" wurde nicht gefunden` }, { status: 404 });
         }
-        return NextResponse.json({ message: `Video "${songName}" gelöscht (DB).`, songName, category });
+        return NextResponse.json({ message: `${category === 'boomwhacker' ? 'Boomwhacker' : 'Video'} "${songName}" gelöscht (DB).`, songName, category });
       }
       // Fallback Dateisystem
-      const filePath = path.join(process.cwd(), 'public', 'videos', `${songName}.json`);
+      const filePath = path.join(process.cwd(), 'public', category, `${songName}.json`);
       try {
         await rm(filePath, { force: true });
-        return NextResponse.json({ message: `Video "${songName}" gelöscht!`, songName, category });
+        return NextResponse.json({ message: `${category === 'boomwhacker' ? 'Boomwhacker' : 'Video'} "${songName}" gelöscht!`, songName, category });
       } catch (e) {
         return NextResponse.json({ message: 'Fehler beim Löschen: ' + (e as Error).message }, { status: 500 });
       }
