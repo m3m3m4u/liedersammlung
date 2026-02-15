@@ -10,6 +10,8 @@ interface ExtractedFile {
   data: Buffer;
 }
 
+const MAX_UPLOAD_SIZE_BYTES = 5 * 1024 * 1024;
+
 async function uploadImagesWebdav(type: string, songName: string, files: ExtractedFile[]) {
   const client = getWebdavClient();
   const baseDir = `/${type}`;
@@ -45,6 +47,13 @@ export async function POST(request: NextRequest) {
 
     if (!uploadFile) {
       return NextResponse.json({ message: 'Keine Datei gefunden' }, { status: 400 });
+    }
+
+    if (uploadFile.size > MAX_UPLOAD_SIZE_BYTES) {
+      return NextResponse.json(
+        { message: 'Datei ist zu groß. Maximal erlaubt sind 5 MB pro ZIP-Datei.' },
+        { status: 413 }
+      );
     }
 
     if (type !== 'noten' && type !== 'texte') {
@@ -130,7 +139,7 @@ export async function POST(request: NextRequest) {
 export const config = {
   api: {
     bodyParser: {
-      sizeLimit: '50mb',
+      sizeLimit: '5mb',
     },
   },
 }

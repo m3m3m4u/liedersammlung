@@ -8,6 +8,7 @@ interface SongUploadProps {
 }
 
 export default function SongUpload({ onBack, onUploadSuccess }: SongUploadProps) {
+  const MAX_ZIP_SIZE_BYTES = 5 * 1024 * 1024;
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -48,10 +49,19 @@ export default function SongUpload({ onBack, onUploadSuccess }: SongUploadProps)
     const validFiles = files.filter(file => 
       file.name.toLowerCase().endsWith('.zip')
     );
+    const oversizedFiles = validFiles.filter(file => file.size > MAX_ZIP_SIZE_BYTES);
+    const allowedFiles = validFiles.filter(file => file.size <= MAX_ZIP_SIZE_BYTES);
     
-    if (validFiles.length > 0) {
-      setSelectedFiles(validFiles);
-      setMessage(`📁 ${validFiles.length} Datei(en) ausgewählt`);
+    if (allowedFiles.length > 0) {
+      setSelectedFiles(allowedFiles);
+      if (oversizedFiles.length > 0) {
+        setMessage(`⚠️ ${allowedFiles.length} Datei(en) ausgewählt. ${oversizedFiles.length} Datei(en) sind größer als 5 MB und wurden ausgelassen.`);
+      } else {
+        setMessage(`📁 ${allowedFiles.length} Datei(en) ausgewählt`);
+      }
+    } else if (oversizedFiles.length > 0) {
+      setSelectedFiles([]);
+      setMessage('❌ Datei ist zu groß. Maximal erlaubt sind 5 MB pro ZIP-Datei.');
     } else {
       setMessage('❌ Bitte nur ZIP-Dateien hochladen!');
     }
@@ -62,10 +72,19 @@ export default function SongUpload({ onBack, onUploadSuccess }: SongUploadProps)
     const validFiles = files.filter(file => 
       file.name.toLowerCase().endsWith('.zip')
     );
+    const oversizedFiles = validFiles.filter(file => file.size > MAX_ZIP_SIZE_BYTES);
+    const allowedFiles = validFiles.filter(file => file.size <= MAX_ZIP_SIZE_BYTES);
     
-    if (validFiles.length > 0) {
-      setSelectedFiles(validFiles);
-      setMessage(`📁 ${validFiles.length} Datei(en) ausgewählt`);
+    if (allowedFiles.length > 0) {
+      setSelectedFiles(allowedFiles);
+      if (oversizedFiles.length > 0) {
+        setMessage(`⚠️ ${allowedFiles.length} Datei(en) ausgewählt. ${oversizedFiles.length} Datei(en) sind größer als 5 MB und wurden ausgelassen.`);
+      } else {
+        setMessage(`📁 ${allowedFiles.length} Datei(en) ausgewählt`);
+      }
+    } else if (oversizedFiles.length > 0) {
+      setSelectedFiles([]);
+      setMessage('❌ Datei ist zu groß. Maximal erlaubt sind 5 MB pro ZIP-Datei.');
     } else {
       setMessage('❌ Bitte ZIP-Dateien auswählen!');
     }
