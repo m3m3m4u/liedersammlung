@@ -127,24 +127,28 @@ export default function VideoDetail({ song, onBack, onHome, categoryLabel = 'Vid
         {song.videoUrl ? (
           <div style={{ 
             width: '100%', 
-            maxWidth: '1600px', // Erhöht von 1200px auf 1600px
-            aspectRatio: '16/9',
+            maxWidth: '1600px',
             background: '#000',
             borderRadius: '12px',
             overflow: 'hidden',
             boxShadow: '0 8px 32px rgba(0,0,0,0.3)'
           }}>
-            <iframe
-              src={embedUrl}
-              style={{
-                width: '100%',
-                height: '100%',
-                border: 'none'
-              }}
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              allowFullScreen
-              title={song.title}
-            />
+            <div style={{ position: 'relative', width: '100%', paddingTop: '56.25%' }}>
+              <iframe
+                src={embedUrl}
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: '100%',
+                  height: '100%',
+                  border: 'none'
+                }}
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+                title={song.title}
+              />
+            </div>
           </div>
         ) : (
           <div className="text-center">
